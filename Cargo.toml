@@ -1,0 +1,22 @@
+[package]
+name = "hc_crud_ceps"
+version = "0.1.0"
+authors = ["Matthew Brisebois <matthew.brisebois@holo.host>"]
+edition = "2018"
+license = "CAL-1.0"
+repository = "https://github.com/mjbrisebois/rust-hc-crud-ceps"
+description = "A CRUD library for Holochain zomes that implement the CEPS pattern (Chained, Entry, Permalink, State-based)"
+readme = "README.md"
+
+[lib]
+name = "hc_crud"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdk = "0.0.106"
+serde = "1.0"
+thiserror = "1.0"
+
+[dev-dependencies]
+holo_hash = { version = "0.0.6", features = [ "hashing", "encoding" ] }
+rand = "0.8.3"
