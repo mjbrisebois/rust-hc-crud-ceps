@@ -1,2 +1,5 @@
 target
 .cargo
+tests/zomes/*.wasm
+tests/dnas/*.dna
+tests/node_modules

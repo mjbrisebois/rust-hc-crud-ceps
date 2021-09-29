@@ -35,18 +35,70 @@ pub fn find_latest_link(links: Vec<Link>) -> Option<Link> {
        })
 }
 
-pub fn fetch_entry_latest(id: EntryHash) -> UtilsResult<(HeaderHash, Element)> {
+
+pub fn get_id_for_addr(addr: &EntryHash) -> UtilsResult<EntryHash> {
+    let parent_links = get_links(addr.to_owned(), Some(LinkTag::new(TAG_ORIGIN)))
+	.map_err(UtilsError::HDKError)?.into_inner();
+
+    match parent_links.len() {
+	0 => Ok( addr.to_owned() ),
+	1 => Ok( parent_links.first().unwrap().target.to_owned() ),
+	_ => Err( UtilsError::MultipleOriginsError(addr.to_owned()) ),
+    }
+}
+
+
+pub fn fetch_element(addr: &EntryHash) -> UtilsResult<(HeaderHash, Element)> {
+    let element = get( addr.to_owned(), GetOptions::latest() )
+	.map_err( UtilsError::HDKError )?
+	.ok_or( UtilsError::EntryNotFoundError(addr.to_owned()) )?;
+
+    Ok( (element.header_address().to_owned(), element) )
+}
+
+
+pub fn check_entry_type<T>(element: &Element, addr: &EntryHash) -> UtilsResult<T>
+where
+    T: Clone + TryFrom<Element, Error = WasmError> + EntryDefRegistration,
+    Entry: TryFrom<T, Error = WasmError>,
+{
+    debug!("Found element (header): {:?}", element.header().entry_type() );
+    let entry = match T::try_from( element.clone() ) {
+	Ok(entry) => entry,
+	Err(_) => {
+	    return Err(UtilsError::DeserializationError( addr.to_owned(), T::entry_def_id() ));
+	},
+    };
+
+    // TODO: Compare element entry type to updated entry type rather than this hack way of rehashing
+    // the entry.
+    //
+    // If rehashing does not result in the same entry hash, that means the entry bytes
+    // coincidentally deserialized into the expected struct.  Some fields would be missing which
+    // results in a different hash.
+    let entry_hash = hash_entry( entry.clone() )?;
+
+    debug!("Verifiying src matches entry type: {:?} == {:?}", addr, entry_hash );
+    if *addr != entry_hash {
+	return Err(UtilsError::WrongEntryTypeError( addr.to_owned(), entry_hash, T::entry_def_id() ));
+    }
+
+    Ok( entry )
+}
+
+
+pub fn fetch_element_latest(id: &EntryHash) -> UtilsResult<(HeaderHash, Element)> {
     //
     // - Get event details `ElementDetails` (expect to be a Create or Update)
     // - If it has updates, select the one with the latest Header timestamp
     // - Get the update element
     //
-    let result = get(id.clone(), GetOptions::latest())
+    let result = get(id.to_owned(), GetOptions::latest())
 	.map_err(UtilsError::HDKError)?;
 
-    let mut element = result.ok_or(UtilsError::EntryNotFoundError(id.clone()))?;
+    let mut element = result.ok_or(UtilsError::EntryNotFoundError(id.to_owned()))?;
 
-    let update_links = get_links(id.clone(), Some(LinkTag::new(TAG_UPDATE)))
+    let update_links = get_links(id.to_owned(), Some(LinkTag::new(TAG_UPDATE)))
 	.map_err(UtilsError::HDKError)?.into_inner();
 
     debug!("Found {} update links for entry: {}", update_links.len(), id );
@@ -62,41 +114,6 @@ pub fn fetch_entry_latest(id: EntryHash) -> UtilsResult<(HeaderHash, Element)> {
     Ok( (element.header_address().to_owned(), element) )
 }
 
-pub fn get_id_for_addr(addr: EntryHash) -> UtilsResult<EntryHash> {
-    let parent_links = get_links(addr.clone(), Some(LinkTag::new(TAG_ORIGIN)))
-	.map_err(UtilsError::HDKError)?.into_inner();
-
-    match parent_links.len() {
-	0 => Ok( addr ),
-	1 => Ok( parent_links.first().unwrap().target.clone() ),
-	_ => Err( UtilsError::MultipleOriginsError(addr) ),
-    }
-}
-
-pub fn fetch_entry(addr: EntryHash) -> UtilsResult<(HeaderHash, Element)> {
-    let element = get(addr.clone(), GetOptions::latest())
-	.map_err( UtilsError::HDKError )?
-	.ok_or( UtilsError::EntryNotFoundError(addr.clone()) )?;
-
-    Ok( (element.header_address().to_owned(), element) )
-}
-
-pub fn get_entity(id: &EntryHash) -> UtilsResult<Entity<Element>> {
-    let (header_hash, element) = fetch_entry_latest( id.clone() )?;
-
-    let address = element
-	.header()
-	.entry_hash()
-	.ok_or(UtilsError::EntryNotFoundError(id.clone()))?;
-
-    Ok(Entity {
-	id: id.clone(),
-	header: header_hash,
-	address: address.to_owned(),
-	ctype: EntityType::new( "element", "entry" ),
-	content: element,
-    })
-}
 
 
 pub fn create_entity<T>(input: &T) -> UtilsResult<Entity<T>>
@@ -114,54 +131,51 @@ where
     let header_hash = create( create_input )
 	.map_err(UtilsError::HDKError)?;
 
-    Ok( Entity {
-	id: entry_hash.clone(),
+    Ok(Entity {
+	id: entry_hash.to_owned(),
 	address: entry_hash,
 	header: header_hash,
 	ctype: input.get_type(),
 	content: input.to_owned(),
-    } )
+    })
 }
 
-pub fn update_entity<T, F>(id: Option<EntryHash>, addr: EntryHash, callback: F) -> UtilsResult<Entity<T>>
+
+pub fn get_entity<T>(id: &EntryHash) -> UtilsResult<Entity<T>>
+where
+    T: Clone + EntryModel + TryFrom<Element, Error = WasmError>,
+{
+    let (header_hash, element) = fetch_element_latest( id )?;
+
+    let address = element
+	.header()
+	.entry_hash()
+	.ok_or(UtilsError::EntryNotFoundError(id.to_owned()))?;
+
+    let content = T::try_from( element.clone() )?;
+
+    Ok(Entity {
+	id: id.to_owned(),
+	header: header_hash,
+	address: address.to_owned(),
+	ctype: content.get_type(),
+	content: content,
+    })
+}
+
+
+pub fn update_entity<T, F>(addr: &EntryHash, callback: F) -> UtilsResult<Entity<T>>
 where
     T: Clone + EntryModel + TryFrom<Element, Error = WasmError> + EntryDefRegistration,
     CreateInput: TryFrom<T, Error = WasmError>,
     Entry: TryFrom<T, Error = WasmError>,
-    F: FnOnce(Element) -> UtilsResult<T>,
+    F: FnOnce(T, Element) -> UtilsResult<T>,
 {
-    let id = match id {
-	Some(id) => id,
-	None => {
-	    get_id_for_addr( addr.clone() )?
-	},
-    };
+    let (header, element) = fetch_element( addr )?;
 
-    let (header, element) = fetch_entry( addr.clone() )?;
+    let current = check_entry_type( &element, addr )?;
 
-    debug!("Found element (header): {:?}", element.header() );
-    let current = match T::try_from( element.clone() ) {
-	Ok(entry) => entry,
-	Err(_) => {
-	    return Err(UtilsError::DeserializationError( addr, T::entry_def_id() ));
-	},
-    };
-
-    // TODO: Compare element entry type to updated entry type rather than this hack way of rehashing
-    // the entry.
-    //
-    // If rehashing does not result in the same entry hash, that means the entry bytes
-    // coincidentally deserialized into the expected struct.  Some fields would be missing which
-    // results in a different hash.
-    let current_hash = hash_entry( current.clone() )?;
-
-    debug!("Verifiying src matches entry type: {:?} == {:?}", addr, current_hash );
-    if addr != current_hash {
-	return Err(UtilsError::WrongEntryTypeError( addr, current_hash, T::entry_def_id() ));
-    }
-
-    let updated_entry = callback( element.clone() )?;
-
+    let updated_entry = callback( current, element.clone() )?;
 
     let create_input = CreateInput::try_from( updated_entry.clone() )
 	.map_err(UtilsError::HDKError)?;
@@ -172,25 +186,65 @@ where
     let header_hash = update( header, create_input )
 	.map_err(UtilsError::HDKError)?;
 
-    debug!("Linking original ({}) to DNA: {}", id, entry_hash );
+    let id = get_id_for_addr( addr )?;
+
+    debug!("Linking original ({}) to: {}", id, entry_hash );
     create_link(
-	id.clone(),
-	entry_hash.clone(),
+	id.to_owned(),
+	entry_hash.to_owned(),
 	LinkTag::new(TAG_UPDATE)
     ).map_err(UtilsError::HDKError)?;
 
-    debug!("Linking DNA ({}) to original: {}", entry_hash, id );
+    debug!("Linking ({}) to original: {}", entry_hash, id );
     create_link(
-	entry_hash.clone(),
-	id.clone(),
+	entry_hash.to_owned(),
+	id.to_owned(),
 	LinkTag::new(TAG_ORIGIN)
     ).map_err(UtilsError::HDKError)?;
 
-    Ok(	Entity {
+    Ok(Entity {
 	id: id,
 	header: header_hash,
 	address: entry_hash,
 	ctype: updated_entry.get_type(),
 	content: updated_entry,
-    } )
+    })
+}
+
+
+pub fn delete_entity<T>(id: &EntryHash) -> UtilsResult<HeaderHash>
+where
+    T: Clone + TryFrom<Element, Error = WasmError> + EntryDefRegistration,
+    Entry: TryFrom<T, Error = WasmError>,
+{
+    let id = get_id_for_addr( id )?;
+    let (header_hash, element) = fetch_element( &id )?;
+
+    check_entry_type::<T>( &element, &id )?;
+    delete_entry( header_hash.to_owned() )?;
+
+    Ok( header_hash )
+}
+
+
+
+pub fn get_entities<T>(id: &EntryHash, link_tag: LinkTag) -> UtilsResult<Collection<Entity<T>>>
+where
+    T: Clone + EntryModel + TryFrom<Element, Error = WasmError>,
+{
+    let links: Vec<Link> = get_links(
+        id.to_owned(),
+	Some(link_tag)
+    )?.into();
+
+    let list = links.into_iter()
+	.filter_map(|link| {
+	    get_entity( &link.target ).ok()
+	})
+	.collect();
+
+    Ok(Collection {
+	base: id.to_owned(),
+	items: list,
+    })
 }
