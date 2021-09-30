@@ -40,6 +40,7 @@ pub fn get_id_for_addr(addr: &EntryHash) -> UtilsResult<EntryHash> {
     let parent_links = get_links(addr.to_owned(), Some(LinkTag::new(TAG_ORIGIN)))
 	.map_err(UtilsError::HDKError)?.into_inner();
 
+    debug!("Found {} parent links for address {:?}", parent_links.len(), addr );
     match parent_links.len() {
 	0 => Ok( addr.to_owned() ),
 	1 => Ok( parent_links.first().unwrap().target.to_owned() ),
@@ -87,16 +88,22 @@ where
 }
 
 
-pub fn fetch_element_latest(id: &EntryHash) -> UtilsResult<(HeaderHash, Element)> {
+pub fn fetch_element_latest(id: &EntryHash) -> UtilsResult<(HeaderHash, Element, Element)> {
     //
     // - Get event details `ElementDetails` (expect to be a Create or Update)
     // - If it has updates, select the one with the latest Header timestamp
     // - Get the update element
     //
+    let origin_addr = get_id_for_addr( id )?;
+    if *id != origin_addr {
+	return Err(UtilsError::NotOriginEntryError( id.to_owned(), origin_addr ));
+    }
+
     let result = get(id.to_owned(), GetOptions::latest())
 	.map_err(UtilsError::HDKError)?;
 
     let mut element = result.ok_or(UtilsError::EntryNotFoundError(id.to_owned()))?;
+    let origin_element = element.clone();
 
     let update_links = get_links(id.to_owned(), Some(LinkTag::new(TAG_UPDATE)))
 	.map_err(UtilsError::HDKError)?.into_inner();
@@ -111,7 +118,7 @@ pub fn fetch_element_latest(id: &EntryHash) -> UtilsResult<(HeaderHash, Element)
 	}
     }
 
-    Ok( (element.header_address().to_owned(), element) )
+    Ok( (element.header_address().to_owned(), element, origin_element) )
 }
 
 
@@ -143,9 +150,13 @@ where
 
 pub fn get_entity<T>(id: &EntryHash) -> UtilsResult<Entity<T>>
 where
-    T: Clone + EntryModel + TryFrom<Element, Error = WasmError>,
+    T: Clone + EntryModel + TryFrom<Element, Error = WasmError> + EntryDefRegistration,
+    Entry: TryFrom<T, Error = WasmError>,
 {
-    let (header_hash, element) = fetch_element_latest( id )?;
+    let (header_hash, element, origin_element) = fetch_element_latest( id )?;
+
+    debug!("Checking that ID {:?} is entry type {:?}", id, T::entry_def_id() );
+    check_entry_type::<T>( &origin_element, id )?;
 
     let address = element
 	.header()
@@ -228,10 +239,20 @@ where
 
 
 
-pub fn get_entities<T>(id: &EntryHash, link_tag: LinkTag) -> UtilsResult<Collection<Entity<T>>>
+pub fn get_entities<B, T>(id: &EntryHash, link_tag: LinkTag) -> UtilsResult<Collection<Entity<T>>>
 where
-    T: Clone + EntryModel + TryFrom<Element, Error = WasmError>,
+    B: Clone + EntryModel + TryFrom<Element, Error = WasmError> + EntryDefRegistration,
+    T: Clone + EntryModel + TryFrom<Element, Error = WasmError> + EntryDefRegistration,
+    Entry: TryFrom<T, Error = WasmError>,
+    Entry: TryFrom<B, Error = WasmError>,
+
 {
+    match get_entity::<B>( id ) {
+	Err(UtilsError::HDKError(WasmError::Serialize(_)))
+	    | Err(UtilsError::DeserializationError(_, _)) => Err(UtilsError::LinkBaseWrongTypeError(id.to_owned(), B::entry_def_id())),
+	x => x,
+    }?;
+
     let links: Vec<Link> = get_links(
         id.to_owned(),
 	Some(link_tag)

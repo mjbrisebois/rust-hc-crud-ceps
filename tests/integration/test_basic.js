@@ -69,16 +69,16 @@ function basic_tests () {
 	    "title": "Goodbye",
 	});
 
-	post				= await clients.alice.callEntity( "happy_path", "happy_path", "update_post", {
-	    "addr": post.$addr,
+	post2				= await clients.alice.callEntity( "happy_path", "happy_path", "update_post", {
+	    "addr": post2.$addr,
 	    "properties": input,
 	});
 
-	expect( post.title		).to.equal( input.title );
-	expect( post.message		).to.equal( input.message );
+	expect( post2.title		).to.equal( input.title );
+	expect( post2.message		).to.equal( input.message );
     });
 
-    it("should test collection", async function () {
+    it("should test 'Collection'", async function () {
 	this.timeout( 5_000 );
 	{
 	    comment			= await clients.alice.callEntity( "happy_path", "happy_path", "create_comment", {
@@ -137,6 +137,14 @@ function basic_tests () {
 }
 
 function errors_tests () {
+    it("should fail to 'get_entity' because address is wrong entry type", async function () {
+	await expect_reject( async () => {
+	    await clients.alice.callEntity( "happy_path", "happy_path", "get_comment", {
+		"id": post2.$id,
+	    });
+	}, RibosomeError, "Deserialized entry to wrong type" );
+    });
+
     it("should fail to update because of wrong entry type", async function () {
 	await expect_reject( async () => {
 	    await clients.alice.callEntity( "happy_path", "happy_path", "update_post", {
@@ -149,7 +157,7 @@ function errors_tests () {
     it("should fail to update because mismatched type", async function () {
 	await expect_reject( async () => {
 	    await clients.alice.callEntity( "happy_path", "happy_path", "update_comment", {
-		"addr": post.$addr,
+		"addr": post2.$addr,
 		"properties": create_comment_input,
 	    });
 	}, RibosomeError, "Deserialized entry to wrong type" );
@@ -180,8 +188,19 @@ function errors_tests () {
 	}, RibosomeError, "Deserialized entry to wrong type" );
     });
 
-    // - Fetch latest with update addr instead of ID
-    // - Get collection with comment ID
+    it("should fail to get because address is an 'update', not an 'origin' entry", async function () {
+	await expect_reject( async () => {
+	    await clients.alice.call( "happy_path", "happy_path", "get_post", {
+		"id": post2.$addr,
+	    });
+	}, RibosomeError, "is an 'update'; Use origin address" );
+    });
+
+    it("should fail to get because ", async function () {
+	await expect_reject( async () => {
+	    await clients.alice.call( "happy_path", "happy_path", "get_comments_for_post", comment2.$id );
+	}, RibosomeError, "is not the expected type: App" );
+    });
 }
 
 describe("DNArepo", () => {

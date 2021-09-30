@@ -139,7 +139,7 @@ pub fn create_comment(mut input: CreateCommentInput) -> ExternResult<Entity<Comm
 
 
 #[hdk_extern]
-pub fn get_comment(input: GetEntityInput) -> ExternResult<Entity<PostEntry>> {
+pub fn get_comment(input: GetEntityInput) -> ExternResult<Entity<CommentEntry>> {
     debug!("Get Post: {:?}", input.id );
     Ok( get_entity( &input.id )? )
 }
@@ -147,7 +147,7 @@ pub fn get_comment(input: GetEntityInput) -> ExternResult<Entity<PostEntry>> {
 
 #[hdk_extern]
 pub fn get_comments_for_post(post_id: EntryHash) -> ExternResult<Collection<Entity<CommentEntry>>> {
-    Ok( get_entities( &post_id, LinkTag::new(TAG_COMMENT) )? )
+    Ok( get_entities::<PostEntry, CommentEntry>( &post_id, LinkTag::new(TAG_COMMENT) )? )
 }
 
 
