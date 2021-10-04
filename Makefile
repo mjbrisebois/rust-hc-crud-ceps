@@ -8,8 +8,7 @@ SHELL		= bash
 tests/package-lock.json:	tests/package.json
 	touch $@
 tests/node_modules:		tests/package-lock.json
-	cd tests; \
-	npm install
+	cd tests; npm install
 	touch $@
 rebuild:			clean build
 build:				dnarepo happdna
@@ -27,22 +26,35 @@ publish-crate:
 #
 test:				test-unit test-integration
 test-debug:			test-unit test-integration-debug
+test-setup:			tests/node_modules
 
 test-unit:
 	RUST_BACKTRACE=1 cargo test
 
-# test-integration:		integration
-# 	cd tests; RUST_LOG=none npx mocha integration/test_basic.js
-# test-integration-debug:		integration
-# 	cd tests; RUST_LOG=info LOG_LEVEL=silly npx mocha integration/test_basic.js
+DNA_NAME			= happy_path
+TEST_DNA			= tests/dnas/$(DNA_NAME).dna
+TEST_DNA_WASM			= tests/zomes/$(DNA_NAME).wasm
+
+tests/dnas/%.dna:		tests/dnas/%/dna.yaml tests/zomes/%.wasm
+	hc dna pack -o $@ tests/dnas/$*/
+
+tests/zomes/%.wasm:		tests/zomes/%/src/*.rs tests/zomes/%/Cargo.toml Cargo.toml src/*.rs
+	cd tests/zomes/; RUST_BACKTRACE=1 CARGO_TARGET_DIR=target cargo build --release \
+	    --target wasm32-unknown-unknown \
+	    --package $*
+	mv tests/zomes/target/wasm32-unknown-unknown/release/$*.wasm $@
+
+test-integration:		test-setup $(TEST_DNA)
+	cd tests; npx mocha integration/test_basic.js
+test-integration-debug:		test-setup $(TEST_DNA)
+	cd tests; RUST_LOG=info LOG_LEVEL=silly npx mocha integration/test_basic.js
 
 
 #
 # Documentation
 #
-build-docs:			build-mere-memory-docs
-build-mere-memory-docs:
-	cd zomes; cargo doc -p hc_zome_mere_memory
+build-docs:
+	cargo doc
 
 
 #

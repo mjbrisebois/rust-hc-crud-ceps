@@ -1,11 +1,16 @@
-use hdk::prelude::*;
+use hdk::prelude::{
+    EntryHash, HeaderHash, Serialize, Deserialize,
+};
 
 
+/// An Entity categorization format that required the name and model values
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EntityType {
     pub name: String,
     pub model: String,
 }
+
+/// Identifies a struct as an Entity model type
 pub trait EntryModel {
     fn get_type(&self) -> EntityType;
 }
@@ -20,13 +25,7 @@ impl EntityType {
 }
 
 
-#[derive(Debug, Serialize)]
-pub struct Metadata {
-    pub composition: &'static str,
-}
-
-
-
+/// The context and content of a specific entry
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Entity<T> {
     pub id: EntryHash,
@@ -63,7 +62,7 @@ impl<T> Entity<T> {
 }
 
 
-
+/// A list of items associated with a base EntryHash
 #[derive(Debug, Serialize)]
 pub struct Collection<T> {
     pub base: EntryHash,
@@ -82,8 +81,8 @@ pub mod tests {
     ///
     fn entity_test() {
 	let bytes = rand::thread_rng().gen::<[u8; 32]>();
-	let ehash = crate::holo_hash::EntryHash::from_raw_32( bytes.to_vec() );
-	let hhash = crate::holo_hash::HeaderHash::from_raw_32( bytes.to_vec() );
+	let ehash = holo_hash::EntryHash::from_raw_32( bytes.to_vec() );
+	let hhash = holo_hash::HeaderHash::from_raw_32( bytes.to_vec() );
 
 	let item = Entity {
 	    id: ehash.clone(),
