@@ -18,7 +18,7 @@ hc_crud_ceps:			hc_crud_ceps/src/*.rs
 preview-crate:
 	cargo publish --dry-run
 publish-crate:
-	cargo publish
+	CARGO_HOME=$(HOME)/.cargo cargo publish
 
 
 #
