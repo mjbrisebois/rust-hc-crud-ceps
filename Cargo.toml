@@ -14,9 +14,9 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 hdk = "0.0.106"
+holo_hash = { version = "0.0.6", features = [ "hashing", "encoding" ] }
 serde = "1"
 thiserror = "1"
 
 [dev-dependencies]
-holo_hash = { version = "0.0.6", features = [ "hashing", "encoding" ] }
 rand = "0.8.3"

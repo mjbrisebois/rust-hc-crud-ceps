@@ -1,10 +1,28 @@
 use hdk::prelude::*;
 use hc_crud::{
-    now, create_entity, get_entity, update_entity, delete_entity, get_id_for_addr, get_entities,
-    Entity, Collection,
-    GetEntityInput, UpdateEntityInput,
-    EntryModel, EntityType,
+    now, create_entity, get_entity, update_entity, delete_entity, get_origin_address, get_entities,
+    Entity, Collection, EntryModel, EntityType,
 };
+
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GetEntityInput {
+    pub id: EntryHash,
+}
+
+impl GetEntityInput {
+    pub fn new(id: EntryHash) -> Self {
+	GetEntityInput {
+	    id: id,
+	}
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpdateEntityInput<T> {
+    pub addr: EntryHash,
+    pub properties: T,
+}
 
 const TAG_POST: &'static str = "post";
 const TAG_COMMENT: &'static str = "comment";
@@ -116,7 +134,7 @@ pub struct CreateCommentInput {
 }
 #[hdk_extern]
 pub fn create_comment(mut input: CreateCommentInput) -> ExternResult<Entity<CommentEntry>> {
-    let post_id = get_id_for_addr( &input.post_id )?;
+    let post_id = get_origin_address( &input.post_id )?;
 
     // Check that the post exists and is not deleted
     get_post( GetEntityInput::new( post_id.clone() ) )?;
