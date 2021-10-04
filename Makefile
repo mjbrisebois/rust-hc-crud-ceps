@@ -5,31 +5,28 @@ SHELL		= bash
 #
 # Project
 #
-tests/package-lock.json:	tests/package.json
-	touch $@
-tests/node_modules:		tests/package-lock.json
-	cd tests; npm install
-	touch $@
-rebuild:			clean build
-build:				dnarepo happdna
-
-hc_crud_ceps:			hc_crud_ceps/src/*.rs
-	cd $@; cargo build && touch $@
-preview-crate:
+preview-crate:			test-debug
 	cargo publish --dry-run
-publish-crate:
+publish-crate:			test-debug
 	CARGO_HOME=$(HOME)/.cargo cargo publish
 
 
 #
 # Testing
 #
+tests/package-lock.json:	tests/package.json
+	touch $@
+tests/node_modules:		tests/package-lock.json
+	cd tests; npm install
+	touch $@
 test:				test-unit test-integration
 test-debug:			test-unit test-integration-debug
 test-setup:			tests/node_modules
 
 test-unit:
-	RUST_BACKTRACE=1 cargo test
+	cargo test --quiet --tests
+test-unit-debug:
+	RUST_BACKTRACE=1 cargo test --tests
 
 DNA_NAME			= happy_path
 TEST_DNA			= tests/dnas/$(DNA_NAME).dna
@@ -53,7 +50,9 @@ test-integration-debug:		test-setup $(TEST_DNA)
 #
 # Documentation
 #
-build-docs:
+test-docs:
+	cargo test --doc
+build-docs:			test-docs
 	cargo doc
 
 

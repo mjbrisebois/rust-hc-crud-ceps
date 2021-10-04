@@ -1,68 +1,8 @@
-//! # Basic Usage
+//! Other Resources
 //!
+//! - Source code - [github.com/mjbrisebois/rust-hc-crud-ceps](https://github.com/mjbrisebois/rust-hc-crud-ceps/)
+//! - Cargo package - [crates.io/crates/hc_crud_ceps](https://crates.io/crates/hc_crud_ceps)
 //!
-//! ## CRUD Operations
-//! These imports and structs are assumed for all examples
-//! ```
-//! use hdk::prelude::*;
-//! use hc_crud::{
-//!     Entity, Collection, EntryModel, EntityType,
-//!     create_entity, get_entity, update_entity, delete_entity,
-//!     now, get_origin_address, get_entities,
-//! };
-//!
-//! #[hdk_entry(id = "post", visibility="public")]
-//! #[derive(Clone)]
-//! pub struct PostEntry {
-//!     pub title: String,
-//!     pub message: String,
-//!     pub published_at: Option<u64>,
-//!     pub last_updated: Option<u64>,
-//! }
-//! ```
-//!
-//! ### Create
-//! Create an entry.
-//!
-//! Example
-//! ```ignore
-//! let input = PostEntry {
-//!     title: String::from("Greeting"),
-//!     message: String::from("Hello world!"),
-//!     published_at: Some(1633108520744),
-//!     last_updated: None,
-//! };
-//!
-//! let post_entity = create_entity( &input )?;
-//! ```
-//!
-//! ### Read
-//! Get an entry.
-//!
-//! Example
-//! ```ignore
-//! let post_entity = get_entity( &entity.id )?;
-//! ```
-//!
-//! ### Update
-//! Update an entry.
-//!
-//! Example
-//! ```ignore
-//! let post_entity = update_entity( &entity.address, |mut previous: PostEntry, _| {
-//!     previous.message = String::from("Hello, world!");
-//!     previous.last_updated = Some(1633108520744);
-//!     Ok(previous)
-//! })?;
-//! ```
-//!
-//! ### Delete
-//! Delete an entry.
-//!
-//! Example
-//! ```ignore
-//! delete_entity::<PostEntry>( &entity.id )?;
-//! ```
 
 mod errors;
 mod entities;

@@ -78,7 +78,6 @@ pub mod tests {
     use rand::Rng;
 
     #[test]
-    ///
     fn entity_test() {
 	let bytes = rand::thread_rng().gen::<[u8; 32]>();
 	let ehash = holo_hash::EntryHash::from_raw_32( bytes.to_vec() );

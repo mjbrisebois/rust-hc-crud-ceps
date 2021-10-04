@@ -1,3 +1,4 @@
+[![](https://img.shields.io/crates/v/hc-crud-ceps?style=flat-square)](https://crates.io/crates/hc_crud_ceps)
 
 # Holochain CRUD Library (CEPS pattern)
 A CRUD library for Holochain zomes that implement the CEPS pattern (Chained, Entry, Permalink,
@@ -10,13 +11,96 @@ State-based)
 
 
 ### Holochain Version Map
+For information on which versions of this package work for each Holochain release, see
+[docs/Holochain_Version_Map.md](docs/Holochain_Version_Map.md)
 
-| Holochain Version                                                                                  | Commit Date    | Lair Version                                                                                         | `hc_crud_ceps` (this crate)                                              |
-|----------------------------------------------------------------------------------------------------|----------------|------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------|
-| [`v0.0.100`](https://github.com/holochain/holochain/tree/3bd9181ea35c32993d1550591fd19720b31065f6) | *Apr 20, 2021* | [`v0.0.1-alpha.12`](https://github.com/holochain/lair/tree/2998dd3ad21928115b3a531cbc319e61bc896b78) | N/A                                                                      |
-| [`v0.0.101`](https://github.com/holochain/holochain/tree/ea726cc05aa6064c3b8b4f85fddf3e89429f018e) | *Jul 1, 2021*  | [`v0.0.1-alpha.12`](https://github.com/holochain/lair/tree/2998dd3ad21928115b3a531cbc319e61bc896b78) | N/A                                                                      |
-| [`v0.0.102`](https://github.com/holochain/holochain/tree/6535292238dc1fbd2b60433a2054f7787e4f060e) | *Jul 29, 2021* | [`v0.0.1-alpha.12`](https://github.com/holochain/lair/tree/2998dd3ad21928115b3a531cbc319e61bc896b78) | N/A                                                                      |
-| [`v0.0.103`](https://github.com/holochain/holochain/tree/f3d17d993ad8d988402cc01d73a0095484efbabb) | *Aug 17, 2021* | [`v0.0.3`](https://github.com/holochain/lair/tree/6a9aab37c90566328c13c4d048d1afaf75fc39a9)          | N/A                                                                      |
-| [`v0.0.104`](https://github.com/holochain/holochain/tree/d003eb7a45f1d7125c4701332202761721793d68) | *Aug 25, 2021* | [`v0.0.4`](https://github.com/holochain/lair/tree/d3155ac98ec550c6b5eb097923556958015f9354)          | N/A                                                                      |
-| `v0.0.105` (never released)                                                                        | *Sep 1, 2021*  | [`v0.0.4`](https://github.com/holochain/lair/tree/d3155ac98ec550c6b5eb097923556958015f9354)          | N/A                                                                      |
-| [`v0.0.106`](https://github.com/holochain/holochain/tree/b11908875a9f6a09e8939fbf6f45ff658e3d10a6) | *Sep 16, 2021* | [`v0.0.4`](https://github.com/holochain/lair/tree/d3155ac98ec550c6b5eb097923556958015f9354)          | [`v0.1.0`](https://github.com/mjbrisebois/rust-hc-crud-ceps/tree/v0.1.0) |
+
+## Overview
+
+## Install
+
+Example of adding to `Cargo.toml`
+```toml
+[dependencies]
+hc_crud_ceps = "0.2.0"
+```
+
+Example of importing into your Rust file
+```rust
+use hc_crud::{
+    now, get_origin_address, get_entities,
+    create_entity, get_entity, update_entity, delete_entity,
+    Entity, Collection, EntryModel, EntityType,
+};
+```
+
+
+## Basic Usage
+
+### CRUD Operations
+These imports and structs are assumed for all examples
+```rust
+use hdk::prelude::*;
+use hc_crud::{
+    now, get_origin_address, get_entities,
+    create_entity, get_entity, update_entity, delete_entity,
+    Entity, Collection, EntryModel, EntityType,
+};
+
+#[hdk_entry(id = "post", visibility="public")]
+#[derive(Clone)]
+pub struct PostEntry {
+    pub title: String,
+    pub message: String,
+    pub published_at: Option<u64>,
+    pub last_updated: Option<u64>,
+}
+```
+
+#### Create an entry
+
+Example
+```rust
+let input = PostEntry {
+    title: String::from("Greeting"),
+    message: String::from("Hello world!"),
+    published_at: Some(1633108520744),
+    last_updated: None,
+};
+
+let post_entity = create_entity( &input )?;
+```
+
+#### [Read] Get an entry
+
+Example
+```rust
+let post_entity = get_entity( &entity.id )?;
+```
+
+#### Update an entry
+
+Example
+```rust
+let post_entity = update_entity( &entity.address, |mut previous: PostEntry, _| {
+    previous.message = String::from("Hello, world!");
+    previous.last_updated = Some(1633108520744);
+    Ok(previous)
+})?;
+```
+
+#### Delete an entry
+
+Example
+```rust
+delete_entity::<PostEntry>( &entity.id )?;
+```
+
+
+### API Reference
+
+See [docs.rs/hc_crud_ceps](https://docs.rs/hc_crud_ceps/)
+
+### Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md)
