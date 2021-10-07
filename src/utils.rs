@@ -1,8 +1,9 @@
 
+use std::convert::TryFrom;
 use hdk::prelude::{
     debug, sys_time, hash_entry,
     Element, Entry, Link, EntryHash, WasmError,
-    TryFrom, EntryDefRegistration,
+    EntryDefRegistration,
 };
 use crate::errors::{ UtilsResult, UtilsError };
 

@@ -8,11 +8,12 @@ mod errors;
 mod entities;
 mod utils;
 
+use std::convert::TryFrom;
 use hdk::prelude::{
     debug,
     hash_entry, get, create_entry, update_entry, delete_entry, create_link, get_links,
     Element, Entry, Link, LinkTag, EntryHash, HeaderHash, WasmError,
-    TryFrom, EntryDefRegistration, CreateInput, GetOptions,
+    EntryDefRegistration, CreateInput, GetOptions,
 };
 
 pub use entities::{ Collection, Entity, EntityType, EntryModel };
@@ -178,7 +179,7 @@ where
 
 
 /// Get multiple entities for a given base and link tag filter
-pub fn get_entities<B, T>(id: &EntryHash, link_tag: LinkTag) -> UtilsResult<Collection<Entity<T>>>
+pub fn get_entities<B, T>(id: &EntryHash, tag: Vec<u8>) -> UtilsResult<Collection<Entity<T>>>
 where
     B: Clone + EntryModel + TryFrom<Element, Error = WasmError> + EntryDefRegistration,
     T: Clone + EntryModel + TryFrom<Element, Error = WasmError> + EntryDefRegistration,
@@ -193,7 +194,7 @@ where
 
     let links: Vec<Link> = get_links(
         id.to_owned(),
-	Some(link_tag)
+	Some( LinkTag::new( tag ) )
     )?.into();
 
     let list = links.into_iter()

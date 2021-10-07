@@ -10,7 +10,7 @@ pub enum UtilsError {
     #[error("HDK raised error: {0:?}")]
     HDKError(WasmError),
 
-    /// Occurs when an HDK `get` fails for any reason
+    /// Occurs when an [`hdk::prelude::get`] fails for any reason
     #[error("Entry not found for address: {0:?}")]
     EntryNotFoundError(EntryHash),
 
@@ -32,7 +32,7 @@ pub enum UtilsError {
     #[error("Deserialized entry to wrong type ({2:?}); hash mismatch: addr={0:?}, rehash={1:?}")]
     WrongEntryTypeError(EntryHash, EntryHash, EntryDefId),
 
-    /// This functions as an integrity check to ensure the link base (EntryHash) is the expected
+    /// This functions as an integrity check to ensure the link base ([EntryHash]) is the expected
     /// type
     #[error("Link base ({0:?}) is not the expected type: {1:?}")]
     LinkBaseWrongTypeError(EntryHash, EntryDefId),

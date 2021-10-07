@@ -1,12 +1,17 @@
 use hdk::prelude::{
-    EntryHash, HeaderHash, Serialize, Deserialize,
+    create_link,
+    EntryHash, HeaderHash, LinkTag, Serialize, Deserialize,
 };
+use crate::errors::{ UtilsResult };
 
 
 /// An Entity categorization format that required the name and model values
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EntityType {
+    /// An identifier for the type of data
     pub name: String,
+
+    /// An identifier for the data's structure
     pub model: String,
 }
 
@@ -28,17 +33,38 @@ impl EntityType {
 /// The context and content of a specific entry
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Entity<T> {
+    /// The address of the original created entry
     pub id: EntryHash,
+
+    /// The create/update header of the current entry
     pub header: HeaderHash,
+
+    /// The address of the current entry
     pub address: EntryHash,
+
     #[serde(rename = "type")]
+    /// An identifier for the content's type and structure
     pub ctype: EntityType,
+
+    /// The entity's current value
     pub content: T,
 }
 
-impl<T> Entity<T> {
-    pub fn new_content<M>(&self, content: M) -> Entity<M>
-    where M: EntryModel {
+impl<T> Entity<T>
+where
+    T: Clone,
+{
+    /// Replace the Entity content with another content struct that implements the [EntryModel] trait
+    // TODO: As is, this method allows the entity type to change without warning even though the
+    // function name implies that only the model should change.  How can this be fixed while trying
+    // to avoid returning a Result type.
+    pub fn change_model<F, M>(&self, transformer: F) -> Entity<M>
+    where
+	F: FnOnce(T) -> M,
+	M: EntryModel
+    {
+	let content = transformer( self.content.clone() );
+
 	Entity {
 	    id: self.id.to_owned(),
 	    header: self.header.to_owned(),
@@ -48,16 +74,33 @@ impl<T> Entity<T> {
 	}
     }
 
-    pub fn update_header(mut self, hash: HeaderHash) -> Self {
-	self.header = hash;
+    /// Replace the Entity content with another content value and specify a custom model value
+    pub fn change_model_custom<F, M>(&self, transformer: F) -> Entity<M>
+    where
+	F: FnOnce(T) -> (M, String),
+    {
+	let (content, model) = transformer( self.content.clone() );
 
-	self
+	Entity {
+	    id: self.id.to_owned(),
+	    header: self.header.to_owned(),
+	    address: self.address.to_owned(),
+	    ctype: EntityType {
+		name: self.ctype.name.to_owned(),
+		model: model,
+	    },
+	    content: content,
+	}
     }
 
-    pub fn update_address(mut self, hash: EntryHash) -> Self {
-	self.address = hash;
+    /// Link this entity to the given base with a specific tag.  Shortcut for [`hdk::prelude::create_link`]
+    pub fn link_from (&self, base: &EntryHash, tag: Vec<u8>) -> UtilsResult<HeaderHash> {
+	Ok( create_link( base.to_owned(), self.id.to_owned(), LinkTag::new( tag ) )? )
+    }
 
-	self
+    /// Link the given target to this entity with a specific tag.  Shortcut for [`hdk::prelude::create_link`]
+    pub fn link_to (&self, target: &EntryHash, tag: Vec<u8>) -> UtilsResult<HeaderHash> {
+	Ok( create_link( self.id.to_owned(), target.to_owned(), LinkTag::new( tag ) )? )
     }
 }
 
@@ -65,7 +108,10 @@ impl<T> Entity<T> {
 /// A list of items associated with a base EntryHash
 #[derive(Debug, Serialize)]
 pub struct Collection<T> {
+    /// The base that was used in the [`hdk::prelude::get_links`] request
     pub base: EntryHash,
+
+    /// A list of the values relative to the link results
     pub items: Vec<T>,
 }
 
@@ -76,6 +122,8 @@ pub mod tests {
     use super::*;
 
     use rand::Rng;
+
+    const PI_STR : &'static str = "primitive_inversed";
 
     #[test]
     fn entity_test() {
@@ -93,5 +141,34 @@ pub mod tests {
 
 	assert_eq!( item.ctype.name, "boolean" );
 	assert_eq!( item.ctype.model, "primitive" );
+
+
+	let model = String::from( PI_STR );
+	let new_item = item.change_model_custom( |current| {
+	    ( !current, model.to_owned() )
+	});
+
+	assert_eq!( item.content, true );
+	assert_eq!( new_item.content, false );
+	assert_eq!( new_item.ctype.model, model );
+
+	#[derive(Clone)]
+	pub struct AnswerEntry {
+	    pub answer: bool,
+	}
+
+	impl EntryModel for AnswerEntry {
+	    fn get_type(&self) -> EntityType {
+		EntityType::new( "answer", PI_STR )
+	    }
+	}
+
+	let new_item = item.change_model( |current| {
+	    AnswerEntry { answer: !current }
+	});
+
+	assert_eq!( item.content, true );
+	assert_eq!( new_item.content.answer, false );
+	assert_eq!( new_item.ctype.model, model );
     }
 }

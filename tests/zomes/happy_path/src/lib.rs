@@ -84,11 +84,7 @@ pub fn create_post(mut input: PostEntry) -> ExternResult<Entity<PostEntry>> {
 
     let pubkey = agent_info()?.agent_initial_pubkey;
 
-    create_link(
-	pubkey.into(),
-	entity.id.clone(),
-	LinkTag::new( TAG_POST )
-    )?;
+    entity.link_from( &pubkey.into(), TAG_POST.into() )?;
 
     Ok( entity )
 }
@@ -147,11 +143,7 @@ pub fn create_comment(mut input: CreateCommentInput) -> ExternResult<Entity<Comm
     debug!("Creating new comment entry: {:?}", input.comment );
     let entity = create_entity( &input.comment )?;
 
-    create_link(
-	post_id,
-	entity.id.clone(),
-	LinkTag::new( TAG_COMMENT )
-    )?;
+    entity.link_from( &post_id, TAG_COMMENT.into() )?;
 
     Ok( entity )
 }
@@ -166,7 +158,7 @@ pub fn get_comment(input: GetEntityInput) -> ExternResult<Entity<CommentEntry>> 
 
 #[hdk_extern]
 pub fn get_comments_for_post(post_id: EntryHash) -> ExternResult<Collection<Entity<CommentEntry>>> {
-    Ok( get_entities::<PostEntry, CommentEntry>( &post_id, LinkTag::new(TAG_COMMENT) )? )
+    Ok( get_entities::<PostEntry, CommentEntry, >( &post_id, TAG_COMMENT.into() )? )
 }
 
 

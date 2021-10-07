@@ -22,14 +22,14 @@ For information on which versions of this package work for each Holochain releas
 Example of adding to `Cargo.toml`
 ```toml
 [dependencies]
-hc_crud_ceps = "0.2.0"
+hc_crud_ceps = "0.3.0"
 ```
 
 Example of importing into your Rust file
 ```rust
 use hc_crud::{
-    now, get_origin_address, get_entities,
-    create_entity, get_entity, update_entity, delete_entity,
+    now, get_origin_address, fetch_element, fetch_element_latest,
+    create_entity, get_entity, update_entity, delete_entity, get_entities,
     Entity, Collection, EntryModel, EntityType,
 };
 ```
@@ -42,8 +42,8 @@ These imports and structs are assumed for all examples
 ```rust
 use hdk::prelude::*;
 use hc_crud::{
-    now, get_origin_address, get_entities,
-    create_entity, get_entity, update_entity, delete_entity,
+    now,
+    create_entity, get_entity, update_entity, delete_entity, get_entities,
     Entity, Collection, EntryModel, EntityType,
 };
 
@@ -54,6 +54,12 @@ pub struct PostEntry {
     pub message: String,
     pub published_at: Option<u64>,
     pub last_updated: Option<u64>,
+}
+
+impl EntryModel for PostEntry {
+    fn get_type(&self) -> EntityType {
+        EntityType::new( "post", "entry" )
+    }
 }
 ```
 
@@ -84,7 +90,7 @@ Example
 ```rust
 let post_entity = update_entity( &entity.address, |mut previous: PostEntry, _| {
     previous.message = String::from("Hello, world!");
-    previous.last_updated = Some(1633108520744);
+    previous.last_updated = Some( now()? );
     Ok(previous)
 })?;
 ```
@@ -94,6 +100,47 @@ let post_entity = update_entity( &entity.address, |mut previous: PostEntry, _| {
 Example
 ```rust
 delete_entity::<PostEntry>( &entity.id )?;
+```
+
+
+### Example of CRUD for relationships
+Create a 1-to-many relationship for post entries to have comment entries.
+
+The following examples use this additional struct
+```rust
+#[hdk_entry(id = "comment", visibility="public")]
+#[derive(Clone)]
+pub struct CommentEntry {
+    pub message: String,
+    pub published_at: Option<u64>,
+    pub last_updated: Option<u64>,
+}
+
+impl EntryModel for CommentEntry {
+    fn get_type(&self) -> EntityType {
+        EntityType::new( "comment", "entry" )
+    }
+}
+```
+
+Create a `CommentEntry` and link it to the `PostEntry`
+```rust
+const TAG_COMMENT: &'static str = "comment";
+
+let input = CommentEntry {
+    message: String::from("Where is the sun?"),
+    published_at: Some( now()? ),
+    last_updated: None,
+};
+
+let comment_entity = create_entity( &input )?;
+
+comment_entity.link_from( &post_entity.id, TAG_COMMENT.into() )?;
+```
+
+Get a `Collection` for a specific base and tag
+```rust
+let collection = get_entities::<PostEntry, CommentEntry>( &post_entity.id, TAG_COMMENT.into() )?;
 ```
 
 
