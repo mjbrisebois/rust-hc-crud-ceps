@@ -44,7 +44,6 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
 #[hdk_entry(id = "post", visibility="public")]
 #[derive(Clone)]
 pub struct PostEntry {
-    pub title: String,
     pub message: String,
     pub published_at: Option<u64>,
     pub last_updated: Option<u64>,
@@ -60,6 +59,7 @@ impl EntryModel for PostEntry {
 #[hdk_entry(id = "comment", visibility="public")]
 #[derive(Clone)]
 pub struct CommentEntry {
+    pub for_post: EntryHash,
     pub message: String,
     pub published_at: Option<u64>,
     pub last_updated: Option<u64>,
@@ -68,6 +68,31 @@ pub struct CommentEntry {
 impl EntryModel for CommentEntry {
     fn get_type(&self) -> EntityType {
 	EntityType::new( "comment", "entry" )
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct CommentInfo {
+    pub for_post: Option<Entity<PostEntry>>,
+    pub message: String,
+    pub published_at: Option<u64>,
+    pub last_updated: Option<u64>,
+}
+
+impl EntryModel for CommentInfo {
+    fn get_type(&self) -> EntityType {
+	EntityType::new( "comment", "info" )
+    }
+}
+
+impl CommentEntry {
+    pub fn to_info(&self) -> CommentInfo {
+	CommentInfo {
+	    for_post: get_entity::<PostEntry>( &self.for_post ).ok(),
+	    message: self.message.to_owned(),
+	    published_at: self.published_at.to_owned(),
+	    last_updated: self.last_updated.to_owned(),
+	}
     }
 }
 
@@ -130,7 +155,7 @@ pub struct CreateCommentInput {
     pub comment: CommentEntry,
 }
 #[hdk_extern]
-pub fn create_comment(mut input: CreateCommentInput) -> ExternResult<Entity<CommentEntry>> {
+pub fn create_comment(mut input: CreateCommentInput) -> ExternResult<Entity<CommentInfo>> {
     let post_id = get_origin_address( &input.post_id )?;
 
     // Check that the post exists and is not deleted
@@ -141,7 +166,8 @@ pub fn create_comment(mut input: CreateCommentInput) -> ExternResult<Entity<Comm
     }
 
     debug!("Creating new comment entry: {:?}", input.comment );
-    let entity = create_entity( &input.comment )?;
+    let entity = create_entity( &input.comment )?
+	.change_model( |comment| comment.to_info() );
 
     entity.link_from( &post_id, TAG_COMMENT.into() )?;
 
@@ -150,15 +176,25 @@ pub fn create_comment(mut input: CreateCommentInput) -> ExternResult<Entity<Comm
 
 
 #[hdk_extern]
-pub fn get_comment(input: GetEntityInput) -> ExternResult<Entity<CommentEntry>> {
+pub fn get_comment(input: GetEntityInput) -> ExternResult<Entity<CommentInfo>> {
     debug!("Get Post: {:?}", input.id );
-    Ok( get_entity( &input.id )? )
+    Ok(
+	get_entity::<CommentEntry>( &input.id )?
+	    .change_model( |comment| comment.to_info() )
+    )
 }
 
 
 #[hdk_extern]
 pub fn get_comments_for_post(post_id: EntryHash) -> ExternResult<Collection<Entity<CommentEntry>>> {
     Ok( get_entities::<PostEntry, CommentEntry, >( &post_id, TAG_COMMENT.into() )? )
+}
+
+
+// This method is for one of the failure tests; that is why it doesn't make logical sense.
+#[hdk_extern]
+pub fn get_posts_for_comment(comment_id: EntryHash) -> ExternResult<Collection<Entity<PostEntry>>> {
+    Ok( get_entities::<CommentEntry, PostEntry, >( &comment_id, TAG_COMMENT.into() )? )
 }
 
 

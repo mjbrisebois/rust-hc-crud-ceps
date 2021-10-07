@@ -50,16 +50,14 @@ pub struct Entity<T> {
     pub content: T,
 }
 
-impl<T> Entity<T>
-where
-    T: Clone,
-{
+impl<T> Entity<T> {
     /// Replace the Entity content with another content struct that implements the [EntryModel] trait
     // TODO: As is, this method allows the entity type to change without warning even though the
     // function name implies that only the model should change.  How can this be fixed while trying
     // to avoid returning a Result type.
     pub fn change_model<F, M>(&self, transformer: F) -> Entity<M>
     where
+	T: Clone,
 	F: FnOnce(T) -> M,
 	M: EntryModel
     {
@@ -77,6 +75,7 @@ where
     /// Replace the Entity content with another content value and specify a custom model value
     pub fn change_model_custom<F, M>(&self, transformer: F) -> Entity<M>
     where
+	T: Clone,
 	F: FnOnce(T) -> (M, String),
     {
 	let (content, model) = transformer( self.content.clone() );
