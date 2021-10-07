@@ -57,7 +57,7 @@ pub fn fetch_element_latest(id: &EntryHash) -> UtilsResult<(HeaderHash, Element,
 	return Err(UtilsError::NotOriginEntryError( id.to_owned(), origin_addr ));
     }
 
-    let (header_addr, mut element) = fetch_element( &id )?;
+    let (_, mut element) = fetch_element( &id )?;
 
     let origin_element = element.clone();
 
@@ -73,7 +73,7 @@ pub fn fetch_element_latest(id: &EntryHash) -> UtilsResult<(HeaderHash, Element,
 	}
     }
 
-    Ok( (header_addr, element, origin_element) )
+    Ok( (element.header_address().to_owned(), element, origin_element) )
 }
 
 

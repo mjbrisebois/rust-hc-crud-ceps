@@ -20,7 +20,7 @@ tests/node_modules:		tests/package-lock.json
 	cd tests; npm install
 	touch $@
 test:				test-unit test-integration
-test-debug:			test-unit test-integration-debug
+test-debug:			test-unit-debug test-integration-debug
 test-setup:			tests/node_modules
 
 test-unit:

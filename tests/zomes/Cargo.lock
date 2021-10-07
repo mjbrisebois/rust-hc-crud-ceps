@@ -213,7 +213,7 @@ checksum = "ab5ef0d4909ef3724cc8cce6ccc8572c5c817592e9285f5464f8e86f8bd3726e"
 
 [[package]]
 name = "hc_crud_ceps"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "hdk",
  "holo_hash",

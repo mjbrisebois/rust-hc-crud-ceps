@@ -69,6 +69,7 @@ function basic_tests () {
 	    "title": "Goodbye",
 	});
 
+	let prev_post			= post2;
 	post2				= await clients.alice.callEntity( "happy_path", "happy_path", "update_post", {
 	    "addr": post2.$addr,
 	    "properties": input,
@@ -76,6 +77,15 @@ function basic_tests () {
 
 	expect( post2.title		).to.equal( input.title );
 	expect( post2.message		).to.equal( input.message );
+	expect( post2.$header		).to.not.deep.equal( prev_post.$header );
+
+	post2				= await clients.alice.callEntity( "happy_path", "happy_path", "get_post", {
+	    "id": post2.$id,
+	});
+
+	expect( post2.title		).to.equal( input.title );
+	expect( post2.message		).to.equal( input.message );
+	expect( post2.$header		).to.not.deep.equal( prev_post.$header );
     });
 
     it("should test 'Collection'", async function () {
@@ -105,15 +115,19 @@ function basic_tests () {
 		"message": "I just want to tell you both, good luck. We're all counting on you.",
 	    });
 
+	    let prev_comment		= comment;
 	    comment			= await clients.alice.callEntity( "happy_path", "happy_path", "update_comment", {
 		"addr": comment.$addr,
 		"properties": input,
 	    });
 
+	    expect( comment.$header	).to.not.deep.equal( prev_comment.$header );
+
 	    let comments		= await clients.alice.callCollection( "happy_path", "happy_path", "get_comments_for_post", post.$id );
 
 	    expect( comments		).to.have.length( 1 );
 	    expect( comments[0].message	).to.equal( input.message );
+	    expect( comments[0].$header	).to.not.deep.equal( prev_comment.$header );
 	}
 
 	{
