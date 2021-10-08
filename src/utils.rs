@@ -55,6 +55,16 @@ where
     // If rehashing does not result in the same entry hash, that means the entry bytes
     // coincidentally deserialized into the expected struct.  Some fields would be missing which
     // results in a different hash.
+    //
+    // UPDATE:
+    //
+    //     The 'entry_defs()` method used to convert an entry def index to an entry def ID is
+    //     defined by the 'entry_defs!' macro (see holochain/crates/hdk/src/entry.rs).  Which means
+    //     it can't be accessed by this function.  It seems the only option would be to have an
+    //     entry type registration function to pass this library the
+    //     hdk::prelude::EntryDefsCallbackResult so it can be used by this method.  I don't like the
+    //     idea of requiring that registration, so it could be an optional optimization where the
+    //     current code is the default check.
 
     debug!("Checking that element entry type {:?} matches expected type {:?}", element.header().entry_type(), T::entry_def() );
     let entry = match T::try_from( element.clone() ) {
