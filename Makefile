@@ -26,7 +26,7 @@ test-setup:			tests/node_modules
 test-unit:
 	cargo test --quiet --tests
 test-unit-debug:
-	RUST_BACKTRACE=1 cargo test --tests
+	RUST_BACKTRACE=1 cargo test --tests -- --nocapture --show-output
 
 DNA_NAME			= happy_path
 TEST_DNA			= tests/dnas/$(DNA_NAME).dna

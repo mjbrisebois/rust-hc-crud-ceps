@@ -138,6 +138,15 @@ function basic_tests () {
 	}
 
 	{
+	    comment			= await clients.alice.callEntity( "happy_path", "happy_path", "move_comment_to_post", {
+		"comment_addr": comment.$addr,
+		"post_id": post2.$id,
+	    });
+
+	    expect( comment.for_post	).to.not.deep.equal( post.$id );
+	}
+
+	{
 	    let delete_hash		= await clients.alice.call( "happy_path", "happy_path", "delete_comment", {
 		"id": comment.$id,
 	    });

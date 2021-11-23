@@ -1,4 +1,4 @@
-[![](https://img.shields.io/crates/v/hc-crud-ceps?style=flat-square)](https://crates.io/crates/hc_crud_ceps)
+[![](https://img.shields.io/crates/v/hc_crud_ceps?style=flat-square)](https://crates.io/crates/hc_crud_ceps)
 
 # Holochain CRUD Library (CEPS pattern)
 A CRUD library for Holochain zomes that implement the CEPS pattern (Chained, Entry, Permalink,

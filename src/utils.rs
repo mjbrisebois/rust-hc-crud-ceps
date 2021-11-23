@@ -2,7 +2,7 @@
 use std::convert::TryFrom;
 use hdk::prelude::{
     debug, sys_time, hash_entry,
-    Element, Entry, Link, EntryHash, WasmError,
+    Element, Entry, Link, EntryHash, WasmError, Path,
     EntryDefRegistration,
 };
 use crate::errors::{ UtilsResult, UtilsError };
@@ -82,4 +82,43 @@ where
     }
 
     Ok( entry )
+}
+
+
+pub fn path_from_collection<T>(segments: T) -> UtilsResult<Path>
+where
+    T: IntoIterator,
+    T::Item: std::fmt::Display,
+{
+    let components : Vec<hdk::hash_path::path::Component> = segments.into_iter()
+	.map( |value| {
+	    hdk::hash_path::path::Component::from( format!("{}", value ) )
+	})
+	.collect();
+
+    Ok( Path::from( components ) )
+}
+
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    use rand::Rng;
+
+    #[test]
+    fn path_from_collection_test() {
+	let path = path_from_collection( vec!["some", "string", "path"] ).unwrap();
+
+	assert_eq!( path, Path::from("some.string.path") );
+
+	let bytes = rand::thread_rng().gen::<[u8; 32]>();
+	let hash = holo_hash::EntryHash::from_raw_32( bytes.to_vec() );
+	let items : Vec<Box<dyn std::fmt::Display>> = vec![ Box::new("some"), Box::new("string"), Box::new(hash.to_owned()) ];
+
+	let path = path_from_collection( items ).unwrap();
+	let path_manual = format!("some.string.{}", hash );
+
+	println!("{:?} == {:?}", path, path_manual );
+	assert_eq!( path, Path::from( path_manual ) );
+    }
 }

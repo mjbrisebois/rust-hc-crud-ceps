@@ -2,7 +2,7 @@ use hdk::prelude::*;
 use hc_crud::{
     now, get_origin_address, get_entities,
     create_entity, get_entity, update_entity, delete_entity,
-    Entity, Collection, EntryModel, EntityType,
+    Entity, Collection, EntryModel, EntityType, // EmptyEntity,
 };
 
 
@@ -221,4 +221,28 @@ pub fn update_comment(mut input: UpdateEntityInput<CommentEntry>) -> ExternResul
 pub fn delete_comment(input: GetEntityInput) -> ExternResult<HeaderHash> {
     debug!("Get Comment: {:?}", input.id );
     Ok( delete_entity::<CommentEntry>( &input.id )? )
+}
+
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct MoveCommentInput {
+    pub comment_addr: EntryHash,
+    pub post_id: EntryHash,
+}
+#[hdk_extern]
+pub fn move_comment_to_post (input: MoveCommentInput) -> ExternResult<Entity<CommentEntry>> {
+    let mut current_base = input.post_id.clone();
+    let new_base = input.post_id.clone();
+
+    let entity = update_entity( &input.comment_addr, |mut previous: CommentEntry, _| {
+	current_base = previous.for_post;
+	previous.for_post = new_base.to_owned();
+
+	Ok( previous )
+    })?;
+
+    debug!("Delinking previous base to ENTRY: {:?}", current_base );
+    entity.move_link_from( TAG_COMMENT.into(), &current_base, &new_base )?;
+
+    Ok( entity )
 }

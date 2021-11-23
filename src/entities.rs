@@ -1,12 +1,12 @@
 use hdk::prelude::{
-    create_link,
+    create_link, get_links, delete_link,
     EntryHash, HeaderHash, LinkTag, Serialize, Deserialize,
 };
 use crate::errors::{ UtilsResult };
 
 
 /// An Entity categorization format that required the name and model values
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EntityType {
     /// An identifier for the type of data
     pub name: String,
@@ -31,7 +31,7 @@ impl EntityType {
 
 
 /// The context and content of a specific entry
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Entity<T> {
     /// The address of the original created entry
     pub id: EntryHash,
@@ -93,15 +93,43 @@ impl<T> Entity<T> {
     }
 
     /// Link this entity to the given base with a specific tag.  Shortcut for [`hdk::prelude::create_link`]
-    pub fn link_from (&self, base: &EntryHash, tag: Vec<u8>) -> UtilsResult<HeaderHash> {
+    pub fn link_from(&self, base: &EntryHash, tag: Vec<u8>) -> UtilsResult<HeaderHash> {
 	Ok( create_link( base.to_owned(), self.id.to_owned(), LinkTag::new( tag ) )? )
     }
 
     /// Link the given target to this entity with a specific tag.  Shortcut for [`hdk::prelude::create_link`]
-    pub fn link_to (&self, target: &EntryHash, tag: Vec<u8>) -> UtilsResult<HeaderHash> {
+    pub fn link_to(&self, target: &EntryHash, tag: Vec<u8>) -> UtilsResult<HeaderHash> {
 	Ok( create_link( self.id.to_owned(), target.to_owned(), LinkTag::new( tag ) )? )
     }
+
+    /// Delete a link matching the `current_base -[tag]-> target` and create a link with `new_base
+    /// -[tag]-> target`
+    // What happens if there are more than 1 matching links?  And is there a way to organize that
+    // ensures we don't have multiple links to the same thing?
+    pub fn move_link_from(&self, tag: Vec<u8>, current_base: &EntryHash, new_base: &EntryHash) -> UtilsResult<HeaderHash> {
+	let tag = LinkTag::new( tag );
+	let all_links = get_links(
+            current_base.clone(),
+	    Some( tag.clone() )
+	)?;
+
+	if let Some(current_link) = all_links.into_inner().into_iter().find(|link| {
+	    link.target == self.id
+	}) {
+	    delete_link( current_link.create_link_hash )?;
+	};
+
+	Ok( create_link( new_base.to_owned(), self.id.to_owned(), tag )? )
+    }
 }
+
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Empty {}
+
+/// A general use entity definition for deserializing any entity input when the content is not
+/// relevant.
+pub type EmptyEntity = Entity<Empty>;
 
 
 /// A list of items associated with a base EntryHash
@@ -115,11 +143,9 @@ pub struct Collection<T> {
 }
 
 
-
 #[cfg(test)]
 pub mod tests {
     use super::*;
-
     use rand::Rng;
 
     const PI_STR : &'static str = "primitive_inversed";

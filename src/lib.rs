@@ -16,9 +16,9 @@ use hdk::prelude::{
     EntryDefRegistration, CreateInput, GetOptions,
 };
 
-pub use entities::{ Collection, Entity, EntityType, EntryModel };
+pub use entities::{ Collection, Entity, EmptyEntity, EntityType, EntryModel };
 pub use errors::{ UtilsResult, UtilsError };
-pub use utils::{ now, find_latest_link, check_entry_type };
+pub use utils::{ now, find_latest_link, check_entry_type, path_from_collection };
 
 
 /// The down-link tag for Entity life-cycles
@@ -131,6 +131,8 @@ where
     Entry: TryFrom<T, Error = WasmError>,
     F: FnOnce(T, Element) -> UtilsResult<T>,
 {
+    // TODO: provide automatic check that the given address is the latest one or an optional flag
+    // to indicate the intension to branch from an older update.
     let (header, element) = fetch_element( addr )?;
 
     let current = check_entry_type( &element, addr )?;
