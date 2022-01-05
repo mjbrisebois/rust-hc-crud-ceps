@@ -1,6 +1,6 @@
 [package]
 name = "hc_crud_ceps"
-version = "0.6.1"
+version = "0.13.0"
 authors = ["Matthew Brisebois <matthew.brisebois@holo.host>"]
 edition = "2018"
 license = "CAL-1.0"
@@ -13,8 +13,8 @@ name = "hc_crud"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-hdk = "0.0.109"
-holo_hash = { version = "0.0.8", features = [ "hashing", "encoding" ] }
+hdk = "0.0.116"
+holo_hash = { version = "0.0.13", features = [ "hashing", "encoding" ] }
 serde = "1"
 thiserror = "1"
 

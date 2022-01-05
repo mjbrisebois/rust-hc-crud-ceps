@@ -28,7 +28,7 @@ pub const TAG_ORIGIN: &'static str = "origin";
 
 /// Get the entity ID for any given entity address
 pub fn get_origin_address(addr: &EntryHash) -> UtilsResult<EntryHash> {
-    let origin_links = get_links(addr.to_owned(), Some(LinkTag::new(TAG_ORIGIN)))?.into_inner();
+    let origin_links = get_links(addr.to_owned(), Some(LinkTag::new(TAG_ORIGIN)))?;
 
     debug!("Found {} [tag: {}] links for address {:?}", origin_links.len(), TAG_ORIGIN, addr );
     match origin_links.len() {
@@ -62,7 +62,7 @@ pub fn fetch_element_latest(id: &EntryHash) -> UtilsResult<(HeaderHash, Element,
 
     let origin_element = element.clone();
 
-    let update_links = get_links(id.to_owned(), Some(LinkTag::new(TAG_UPDATE)))?.into_inner();
+    let update_links = get_links(id.to_owned(), Some(LinkTag::new(TAG_UPDATE)))?;
 
     debug!("Found {} [tag: {}] links for entry: {}", update_links.len(), TAG_UPDATE, id );
     if update_links.len() > 0 {

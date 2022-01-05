@@ -113,7 +113,7 @@ impl<T> Entity<T> {
 	    Some( tag.clone() )
 	)?;
 
-	if let Some(current_link) = all_links.into_inner().into_iter().find(|link| {
+	if let Some(current_link) = all_links.into_iter().find(|link| {
 	    link.target == self.id
 	}) {
 	    delete_link( current_link.create_link_hash )?;
