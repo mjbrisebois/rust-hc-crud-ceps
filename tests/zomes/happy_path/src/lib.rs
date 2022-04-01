@@ -25,6 +25,7 @@ pub struct UpdateEntityInput<T> {
     pub properties: T,
 }
 
+const LT_NONE: u8 = 0;
 const TAG_POST: &'static str = "post";
 const TAG_COMMENT: &'static str = "comment";
 
@@ -109,7 +110,7 @@ pub fn create_post(mut input: PostEntry) -> ExternResult<Entity<PostEntry>> {
 
     let pubkey = agent_info()?.agent_initial_pubkey;
 
-    entity.link_from( &pubkey.into(), TAG_POST.into() )?;
+    entity.link_from( &pubkey.into(), LT_NONE, TAG_POST.into() )?;
 
     Ok( entity )
 }
@@ -169,7 +170,7 @@ pub fn create_comment(mut input: CreateCommentInput) -> ExternResult<Entity<Comm
     let entity = create_entity( &input.comment )?
 	.change_model( |comment| comment.to_info() );
 
-    entity.link_from( &post_id, TAG_COMMENT.into() )?;
+    entity.link_from( &post_id, LT_NONE, TAG_COMMENT.into() )?;
 
     Ok( entity )
 }
@@ -242,7 +243,7 @@ pub fn move_comment_to_post (input: MoveCommentInput) -> ExternResult<Entity<Com
     })?;
 
     debug!("Delinking previous base to ENTRY: {:?}", current_base );
-    entity.move_link_from( TAG_COMMENT.into(), &current_base, &new_base )?;
+    entity.move_link_from( LT_NONE, TAG_COMMENT.into(), &current_base, &new_base )?;
 
     Ok( entity )
 }

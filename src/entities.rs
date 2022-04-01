@@ -1,6 +1,6 @@
 use hdk::prelude::{
     create_link, get_links, delete_link,
-    EntryHash, HeaderHash, LinkTag, Serialize, Deserialize,
+    EntryHash, HeaderHash, LinkType, LinkTag, Serialize, Deserialize,
 };
 use crate::errors::{ UtilsResult };
 
@@ -93,20 +93,20 @@ impl<T> Entity<T> {
     }
 
     /// Link this entity to the given base with a specific tag.  Shortcut for [`hdk::prelude::create_link`]
-    pub fn link_from(&self, base: &EntryHash, tag: Vec<u8>) -> UtilsResult<HeaderHash> {
-	Ok( create_link( base.to_owned(), self.id.to_owned(), LinkTag::new( tag ) )? )
+    pub fn link_from(&self, base: &EntryHash, link_type: u8, tag: Vec<u8>) -> UtilsResult<HeaderHash> {
+	Ok( create_link( base.to_owned(), self.id.to_owned(), LinkType::new( link_type ), LinkTag::new( tag ) )? )
     }
 
     /// Link the given target to this entity with a specific tag.  Shortcut for [`hdk::prelude::create_link`]
-    pub fn link_to(&self, target: &EntryHash, tag: Vec<u8>) -> UtilsResult<HeaderHash> {
-	Ok( create_link( self.id.to_owned(), target.to_owned(), LinkTag::new( tag ) )? )
+    pub fn link_to(&self, target: &EntryHash, link_type: u8, tag: Vec<u8>) -> UtilsResult<HeaderHash> {
+	Ok( create_link( self.id.to_owned(), target.to_owned(), LinkType::new( link_type ), LinkTag::new( tag ) )? )
     }
 
     /// Delete a link matching the `current_base -[tag]-> target` and create a link with `new_base
     /// -[tag]-> target`
     // What happens if there are more than 1 matching links?  And is there a way to organize that
     // ensures we don't have multiple links to the same thing?
-    pub fn move_link_from(&self, tag: Vec<u8>, current_base: &EntryHash, new_base: &EntryHash) -> UtilsResult<HeaderHash> {
+    pub fn move_link_from(&self, link_type: u8, tag: Vec<u8>, current_base: &EntryHash, new_base: &EntryHash) -> UtilsResult<HeaderHash> {
 	let tag = LinkTag::new( tag );
 	let all_links = get_links(
             current_base.clone(),
@@ -119,7 +119,7 @@ impl<T> Entity<T> {
 	    delete_link( current_link.create_link_hash )?;
 	};
 
-	Ok( create_link( new_base.to_owned(), self.id.to_owned(), tag )? )
+	Ok( create_link( new_base.to_owned(), self.id.to_owned(), LinkType::new( link_type ), tag )? )
     }
 }
 

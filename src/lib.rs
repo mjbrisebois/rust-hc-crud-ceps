@@ -12,7 +12,7 @@ use std::convert::TryFrom;
 use hdk::prelude::{
     debug,
     hash_entry, get, create_entry, update_entry, delete_entry, create_link, get_links,
-    Element, Entry, Link, LinkTag, EntryHash, HeaderHash, WasmError,
+    Element, Entry, Link, LinkType, LinkTag, EntryHash, HeaderHash, WasmError,
     EntryDefRegistration, CreateInput, GetOptions,
 };
 
@@ -21,6 +21,8 @@ pub use errors::{ UtilsResult, UtilsError };
 pub use utils::{ now, find_latest_link, check_entry_type, path_from_collection };
 
 
+/// LinkType placeholder
+pub const LT_NONE: LinkType = LinkType(0);
 /// The down-link tag for Entity life-cycles
 pub const TAG_UPDATE: &'static str = "update";
 /// The up-link tag for Entity life-cycles
@@ -146,12 +148,14 @@ where
     create_link(
 	id.to_owned(),
 	entry_hash.to_owned(),
+	LT_NONE,
 	LinkTag::new(TAG_UPDATE)
     )?;
     debug!("Up-link from update to origin: {:?} -[tag: {}]-> {:?}", entry_hash, TAG_ORIGIN, id );
     create_link(
 	entry_hash.to_owned(),
 	id.to_owned(),
+	LT_NONE,
 	LinkTag::new(TAG_ORIGIN)
     )?;
 
