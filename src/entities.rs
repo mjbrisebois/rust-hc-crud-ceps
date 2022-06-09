@@ -114,7 +114,7 @@ impl<T> Entity<T> {
 	)?;
 
 	if let Some(current_link) = all_links.into_iter().find(|link| {
-	    link.target == self.id
+	    link.target == self.id.to_owned().into()
 	}) {
 	    delete_link( current_link.create_link_hash )?;
 	};

@@ -13,7 +13,7 @@ use hdk::prelude::{
     debug,
     hash_entry, get, create_entry, update_entry, delete_entry, create_link, get_links,
     Element, Entry, Link, LinkType, LinkTag, EntryHash, HeaderHash, WasmError,
-    EntryDefRegistration, CreateInput, GetOptions,
+    EntryDefRegistration, GetOptions,
 };
 
 pub use entities::{ Collection, Entity, EmptyEntity, EntityType, EntryModel };
@@ -35,7 +35,7 @@ pub fn get_origin_address(addr: &EntryHash) -> UtilsResult<EntryHash> {
     debug!("Found {} [tag: {}] links for address {:?}", origin_links.len(), TAG_ORIGIN, addr );
     match origin_links.len() {
 	0 => Ok( addr.to_owned() ),
-	1 => Ok( origin_links.first().unwrap().target.to_owned() ),
+	1 => Ok( origin_links.first().unwrap().target.to_owned().into() ),
 	_ => Err( UtilsError::MultipleOriginsError(addr.to_owned()) ),
     }
 }
@@ -83,8 +83,7 @@ pub fn fetch_element_latest(id: &EntryHash) -> UtilsResult<(HeaderHash, Element,
 /// Create a new entity
 pub fn create_entity<T>(input: &T) -> UtilsResult<Entity<T>>
 where
-    T: Clone + EntryModel,
-    CreateInput: TryFrom<T, Error = WasmError>,
+    T: Clone + EntryModel + EntryDefRegistration,
     Entry: TryFrom<T, Error = WasmError>,
 {
     let entry_hash = hash_entry( input.to_owned() )?;
@@ -129,7 +128,6 @@ where
 pub fn update_entity<T, F>(addr: &EntryHash, callback: F) -> UtilsResult<Entity<T>>
 where
     T: Clone + EntryModel + TryFrom<Element, Error = WasmError> + EntryDefRegistration,
-    CreateInput: TryFrom<T, Error = WasmError>,
     Entry: TryFrom<T, Error = WasmError>,
     F: FnOnce(T, Element) -> UtilsResult<T>,
 {
@@ -205,7 +203,7 @@ where
 
     let list = links.into_iter()
 	.filter_map(|link| {
-	    get_entity( &link.target ).ok()
+	    get_entity( &link.target.into() ).ok()
 	})
 	.collect();
 
