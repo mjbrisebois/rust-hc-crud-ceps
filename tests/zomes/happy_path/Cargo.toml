@@ -9,5 +9,5 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 hc_crud_ceps = { path = "../../../" }
-hdk = "0.0.132"
+hdk = "0.0.136"
 serde = "1"
