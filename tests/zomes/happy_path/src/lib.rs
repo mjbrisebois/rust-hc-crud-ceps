@@ -226,6 +226,23 @@ pub fn delete_comment(input: GetEntityInput) -> ExternResult<HeaderHash> {
 
 
 #[derive(Clone, Debug, Deserialize)]
+pub struct LinkCommentToPostInput {
+    pub comment_id: EntryHash,
+    pub post_id: EntryHash,
+}
+#[hdk_extern]
+pub fn link_comment_to_post (input: LinkCommentToPostInput) -> ExternResult<HeaderHash> {
+    Ok( create_link(
+	input.post_id,
+	input.comment_id,
+	LinkType::new( LT_NONE ),
+	LinkTag::new( Vec::<u8>::from(TAG_COMMENT) )
+    )? )
+}
+
+
+
+#[derive(Clone, Debug, Deserialize)]
 pub struct MoveCommentInput {
     pub comment_addr: EntryHash,
     pub post_id: EntryHash,

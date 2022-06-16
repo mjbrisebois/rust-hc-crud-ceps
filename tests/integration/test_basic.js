@@ -39,8 +39,11 @@ let comment, comment2;
 let create_post_input			= {
     "message": "Hello, world!",
 };
-let create_comment_input		= {
+let create_comment_input_1		= {
     "message": "Don't call me surely",
+};
+let create_comment_input_2		= {
+    "message": "I've never been on a plane before",
 };
 
 
@@ -86,19 +89,19 @@ function basic_tests () {
     it("should test 'Collection'", async function () {
 	this.timeout( 5_000 );
 	{
-	    create_comment_input.for_post = post.$id;
+	    create_comment_input_1.for_post = post.$id;
 	    comment			= await clients.alice.callEntity( "happy_path", "happy_path", "create_comment", {
 		"post_id": post.$id,
-		"comment": create_comment_input,
+		"comment": create_comment_input_1,
 	    });
 
-	    expect( comment.message		).to.equal( create_comment_input.message );
+	    expect( comment.message		).to.equal( create_comment_input_1.message );
 	    expect( comment.for_post.$id	).to.deep.equal( post.$id );
 
-	    create_comment_input.for_post = post2.$id;
+	    create_comment_input_2.for_post = post2.$id;
 	    comment2			= await clients.alice.callEntity( "happy_path", "happy_path", "create_comment", {
 		"post_id": post2.$id,
-		"comment": create_comment_input,
+		"comment": create_comment_input_2,
 	    });
 	}
 
@@ -107,7 +110,7 @@ function basic_tests () {
 		"id": comment.$id,
 	    });
 
-	    expect( comment.message		).to.equal( create_comment_input.message );
+	    expect( comment.message		).to.equal( create_comment_input_1.message );
 	    expect( comment.for_post.$id	).to.deep.equal( post.$id );
 	}
 
@@ -118,7 +121,7 @@ function basic_tests () {
 	}
 
 	{
-	    let input			= Object.assign( {}, create_comment_input, {
+	    let input			= Object.assign( {}, create_comment_input_1, {
 		"message": "I just want to tell you both, good luck. We're all counting on you.",
 	    });
 
@@ -138,12 +141,31 @@ function basic_tests () {
 	}
 
 	{
+	    await clients.alice.callEntity( "happy_path", "happy_path", "link_comment_to_post", {
+		"comment_id": comment.$id,
+		"post_id": post2.$id,
+	    });
+
+	    let comments		= await clients.alice.callCollection( "happy_path", "happy_path", "get_comments_for_post", post2.$id );
+
+	    expect( comments		).to.have.length( 2 );
+	}
+
+	{
 	    comment			= await clients.alice.callEntity( "happy_path", "happy_path", "move_comment_to_post", {
 		"comment_addr": comment.$addr,
 		"post_id": post2.$id,
 	    });
 
 	    expect( comment.for_post	).to.not.deep.equal( post.$id );
+
+	    let comments		= await clients.alice.callCollection( "happy_path", "happy_path", "get_comments_for_post", post.$id );
+
+	    expect( comments		).to.have.length( 0 );
+
+	    let comments2		= await clients.alice.callCollection( "happy_path", "happy_path", "get_comments_for_post", post2.$id );
+
+	    expect( comments2		).to.have.length( 2 );
 	}
 
 	{
@@ -151,9 +173,9 @@ function basic_tests () {
 		"id": comment.$id,
 	    });
 
-	    let comments		= await clients.alice.callCollection( "happy_path", "happy_path", "get_comments_for_post", post.$id );
+	    let comments		= await clients.alice.callCollection( "happy_path", "happy_path", "get_comments_for_post", post2.$id );
 
-	    expect( comments		).to.have.length( 0 );
+	    expect( comments		).to.have.length( 1 );
 	}
     });
 
@@ -179,7 +201,7 @@ function errors_tests () {
 	await expect_reject( async () => {
 	    await clients.alice.callEntity( "happy_path", "happy_path", "update_comment", {
 		"addr": post2.$addr,
-		"properties": create_comment_input,
+		"properties": create_comment_input_1,
 	    });
 	}, RibosomeError, "Failed to deserialize entry to type" );
     });
@@ -197,7 +219,7 @@ function errors_tests () {
 	await expect_reject( async () => {
 	    await clients.alice.callEntity( "happy_path", "happy_path", "create_comment", {
 		"post_id": post.$id,
-		"comment": create_comment_input,
+		"comment": create_comment_input_1,
 	    });
 	}, RibosomeError, "Entry not found for address" );
     });

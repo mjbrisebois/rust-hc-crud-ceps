@@ -119,7 +119,19 @@ impl<T> Entity<T> {
 	    delete_link( current_link.create_link_hash )?;
 	};
 
-	Ok( create_link( new_base.to_owned(), self.id.to_owned(), LinkType::new( link_type ), tag )? )
+	let new_links = get_links(
+	    new_base.clone(),
+	    Some( tag.clone() )
+	)?;
+
+	if let Some(existing_link) = new_links.into_iter().find(|link| {
+	    link.target == self.id.to_owned().into()
+	}) {
+	    Ok( existing_link.create_link_hash )
+	}
+	else {
+	    Ok( create_link( new_base.to_owned(), self.id.to_owned(), LinkType::new( link_type ), tag )? )
+	}
     }
 }
 
