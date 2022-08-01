@@ -9,115 +9,134 @@ mod entities;
 mod utils;
 
 use std::convert::TryFrom;
-use hdk::prelude::{
-    debug,
-    hash_entry, get, create_entry, update_entry, delete_entry, create_link, get_links,
-    Element, Entry, Link, LinkType, LinkTag, EntryHash, HeaderHash, WasmError,
-    EntryDefRegistration, GetOptions,
+use hdk::prelude::*;
+
+pub use entities::{ Entity, EmptyEntity, EntityType, EntryModel };
+pub use errors::{ UtilsResult, UtilsError };
+pub use utils::{
+    now, find_latest_link, path_from_collection,
+    trace_action_history, to_entry_type,
 };
 
-pub use entities::{ Collection, Entity, EmptyEntity, EntityType, EntryModel };
-pub use errors::{ UtilsResult, UtilsError };
-pub use utils::{ now, find_latest_link, check_entry_type, path_from_collection };
 
 
-/// LinkType placeholder
-pub const LT_NONE: LinkType = LinkType(0);
-/// The down-link tag for Entity life-cycles
-pub const TAG_UPDATE: &'static str = "update";
-/// The up-link tag for Entity life-cycles
-pub const TAG_ORIGIN: &'static str = "origin";
+/// Get the entity ID for any given entity EntryHash
+pub fn get_origin_address(addr: &ActionHash) -> UtilsResult<EntryHash> {
+    let chain = trace_action_history( addr )?;
 
-/// Get the entity ID for any given entity address
-pub fn get_origin_address(addr: &EntryHash) -> UtilsResult<EntryHash> {
-    let origin_links = get_links(addr.to_owned(), Some(LinkTag::new(TAG_ORIGIN)))?;
+    // The starting 'addr' will always be in the chain so it is safe to unwrap.
+    Ok( chain.last().unwrap().1.to_owned() )
+}
 
-    debug!("Found {} [tag: {}] links for address {:?}", origin_links.len(), TAG_ORIGIN, addr );
-    match origin_links.len() {
-	0 => Ok( addr.to_owned() ),
-	1 => Ok( origin_links.first().unwrap().target.to_owned().into() ),
-	_ => Err( UtilsError::MultipleOriginsError(addr.to_owned()) ),
+/// Get the record for any given EntryHash
+pub fn fetch_record(addr: &EntryHash) -> UtilsResult<(ActionHash, Record)> {
+    let record = get( addr.to_owned(), GetOptions::latest() )?
+	.ok_or( UtilsError::EntryNotFoundError(addr.to_owned(), Some("".to_string())) )?;
+
+    Ok( (record.action_address().to_owned(), record) )
+}
+
+fn find_earliest_update(updates: Vec<SignedHashed<Action>>) -> Option<SignedHashed<Action>> {
+    if updates.len() == 0 {
+	None
+    }
+    else {
+	Some( updates.iter()
+            .fold( None, |acc, sh| {
+		let ts = sh.action().timestamp();
+		match acc {
+		    None => Some( (ts, sh.to_owned()) ),
+		    Some(current) => {
+			Some(match current.0 < ts {
+			    true => current,
+			    false => (ts, sh.to_owned()),
+			})
+		    }
+		}
+	    }).unwrap().1 )
     }
 }
 
-/// Get the element for any given EntryHash
-pub fn fetch_element(addr: &EntryHash) -> UtilsResult<(HeaderHash, Element)> {
-    let element = get( addr.to_owned(), GetOptions::latest() )?
-	.ok_or( UtilsError::EntryNotFoundError(addr.to_owned()) )?;
 
-    Ok( (element.header_address().to_owned(), element) )
+/// Follow the trail of (earliest) updates and return the full Action path.
+pub fn follow_updates(hash: &ActionHash, trace: Option<Vec<ActionHash>>) -> UtilsResult<Vec<ActionHash>> {
+    let mut history = trace.unwrap_or( Vec::new() );
+    history.push( hash.to_owned() );
+
+    let details = get_details( hash.to_owned(), GetOptions::latest() )?
+	.ok_or( UtilsError::ActionNotFoundError(hash.to_owned(), Some("".to_string())) )?;
+    let updates = match details {
+	Details::Record(details) => details.updates,
+	Details::Entry(details) => details.updates,
+    };
+
+    Ok( match find_earliest_update( updates ) {
+	None => history,
+	Some(next_update) => follow_updates( next_update.action_address(), Some(history) )?,
+    })
 }
 
-/// Get the latest element for any given entity ID
-pub fn fetch_element_latest(id: &EntryHash) -> UtilsResult<(HeaderHash, Element, Element)> {
-    //
-    // - Get event details `ElementDetails` (expect to be a Create or Update)
-    // - If it has updates, select the one with the latest Header timestamp
-    // - Get the update element
-    //
-    let origin_addr = get_origin_address( id )?;
-    if *id != origin_addr {
-	return Err(UtilsError::NotOriginEntryError( id.to_owned(), origin_addr ));
+/// Get the latest Record for any given entity ID
+pub fn fetch_record_latest(id: &EntryHash) -> UtilsResult<(ActionHash, Record)> {
+    let (action_hash, first_record) = fetch_record( id )?;
+
+    match first_record.action() {
+	Action::Create(_) => (),
+	_ => Err(UtilsError::NotOriginEntryError(action_hash.to_owned()))?,
     }
 
-    let (_, mut element) = fetch_element( &id )?;
+    let updates = follow_updates( &action_hash, None )?;
+    let latest_action_hash = updates.last().unwrap();
+    let record = get( latest_action_hash.to_owned(), GetOptions::latest() )?
+	.ok_or( UtilsError::ActionNotFoundError(action_hash.to_owned(), Some("".to_string())) )?;
 
-    let origin_element = element.clone();
-
-    let update_links = get_links(id.to_owned(), Some(LinkTag::new(TAG_UPDATE)))?;
-
-    debug!("Found {} [tag: {}] links for entry: {}", update_links.len(), TAG_UPDATE, id );
-    if update_links.len() > 0 {
-	let latest_link = find_latest_link( update_links ).unwrap();
-
-	debug!("Determined {:?} is be the newest state for ID: {:?}", latest_link.target, id );
-	if let Some(v) = get( latest_link.target, GetOptions::latest() )? {
-	    element = v;
-	}
-    }
-
-    Ok( (element.header_address().to_owned(), element, origin_element) )
+    Ok( (action_hash, record) )
 }
+
 
 
 /// Create a new entity
-pub fn create_entity<T>(input: &T) -> UtilsResult<Entity<T>>
+pub fn create_entity<T,I,E>(entry: &T) -> UtilsResult<Entity<T>>
 where
-    T: Clone + EntryModel + EntryDefRegistration,
-    Entry: TryFrom<T, Error = WasmError>,
+    ScopedEntryDefIndex: for<'a> TryFrom<&'a I, Error = E>,
+    ScopedEntryDefIndex: TryFrom<I, Error = WasmError>,
+    EntryVisibility: for<'a> From<&'a I>,
+    Entry: TryFrom<I, Error = E>,
+    Entry: TryFrom<T, Error = E>,
+    WasmError: From<E>,
+    T: Clone + EntryModel<I>,
 {
-    let entry_hash = hash_entry( input.to_owned() )?;
-    let header_hash = create_entry( input.to_owned() )?;
+    let entry_hash = hash_entry( entry.to_owned() )?;
+    let action_hash = create_entry( entry.to_input() )?;
 
     Ok(Entity {
 	id: entry_hash.to_owned(),
 	address: entry_hash,
-	header: header_hash,
-	ctype: input.get_type(),
-	content: input.to_owned(),
+	action: action_hash,
+	ctype: entry.get_type(),
+	content: entry.to_owned(),
     })
 }
 
 /// Get an entity by its ID
-pub fn get_entity<T>(id: &EntryHash) -> UtilsResult<Entity<T>>
+pub fn get_entity<I,ET>(id: &EntryHash) -> UtilsResult<Entity<I>>
 where
-    T: Clone + EntryModel + TryFrom<Element, Error = WasmError> + EntryDefRegistration,
-    Entry: TryFrom<T, Error = WasmError>,
+    I: TryFrom<Record, Error = WasmError> + Clone + EntryModel<ET>,
+    Entry: TryFrom<I, Error = WasmError>,
+    ScopedEntryDefIndex: TryFrom<ET, Error = WasmError>,
 {
-    let (header_hash, element, origin_element) = fetch_element_latest( id )?;
-
-    check_entry_type::<T>( &origin_element, id )?;
-
-    let address = element
-	.header()
+    let (_, record) = fetch_record_latest( id )?;
+    let to_type_input = record.to_owned();
+    let address = record
+	.action()
 	.entry_hash()
-	.ok_or(UtilsError::EntryNotFoundError(id.to_owned()))?;
+	.ok_or(UtilsError::EntryNotFoundError(id.to_owned(), None))?;
 
-    let content = T::try_from( element.clone() )?;
+    let content : I = to_entry_type( to_type_input )?;
 
     Ok(Entity {
 	id: id.to_owned(),
-	header: header_hash,
+	action: record.action_address().to_owned(),
 	address: address.to_owned(),
 	ctype: content.get_type(),
 	content: content,
@@ -125,41 +144,31 @@ where
 }
 
 /// Update an entity
-pub fn update_entity<T, F>(addr: &EntryHash, callback: F) -> UtilsResult<Entity<T>>
+pub fn update_entity<T,I,F,E>(addr: &ActionHash, callback: F) -> UtilsResult<Entity<T>>
 where
-    T: Clone + EntryModel + TryFrom<Element, Error = WasmError> + EntryDefRegistration,
-    Entry: TryFrom<T, Error = WasmError>,
-    F: FnOnce(T, Element) -> UtilsResult<T>,
+    ScopedEntryDefIndex: TryFrom<I, Error = WasmError>,
+    Entry: TryFrom<I, Error = E>,
+    Entry: TryFrom<T, Error = E>,
+    WasmError: From<E>,
+    T: TryFrom<Record, Error = WasmError>,
+    T: Clone + EntryModel<I>,
+    F: FnOnce(T, Record) -> UtilsResult<T>,
 {
     // TODO: provide automatic check that the given address is the latest one or an optional flag
     // to indicate the intension to branch from an older update.
-    let (header, element) = fetch_element( addr )?;
+    let id = get_origin_address( &addr )?;
+    let record = get( addr.to_owned(), GetOptions::latest() )?
+	.ok_or( UtilsError::ActionNotFoundError(addr.to_owned(), Some("Given origin for update is not found".to_string())) )?;
 
-    let current = check_entry_type( &element, addr )?;
-    let updated_entry = callback( current, element.clone() )?;
+    let current : T = to_entry_type( record.clone() )?;
+    let updated_entry = callback( current, record.clone() )?;
 
     let entry_hash = hash_entry( updated_entry.to_owned() )?;
-    let header_hash = update_entry( header, updated_entry.to_owned() )?;
-
-    let id = get_origin_address( addr )?; // Get origin address for up/down linking
-    debug!("Down-link from origin to update: {:?} -[tag: {}]-> {:?}", id, TAG_UPDATE, entry_hash );
-    create_link(
-	id.to_owned(),
-	entry_hash.to_owned(),
-	LT_NONE,
-	LinkTag::new(TAG_UPDATE)
-    )?;
-    debug!("Up-link from update to origin: {:?} -[tag: {}]-> {:?}", entry_hash, TAG_ORIGIN, id );
-    create_link(
-	entry_hash.to_owned(),
-	id.to_owned(),
-	LT_NONE,
-	LinkTag::new(TAG_ORIGIN)
-    )?;
+    let action_hash = update_entry( addr.to_owned(), updated_entry.to_input() )?;
 
     Ok(Entity {
 	id: id,
-	header: header_hash,
+	action: action_hash,
 	address: entry_hash,
 	ctype: updated_entry.get_type(),
 	content: updated_entry,
@@ -167,38 +176,32 @@ where
 }
 
 /// Delete an entity
-pub fn delete_entity<T>(id: &EntryHash) -> UtilsResult<HeaderHash>
+pub fn delete_entity<T,ET>(id: &EntryHash) -> UtilsResult<ActionHash>
 where
-    T: Clone + TryFrom<Element, Error = WasmError> + EntryDefRegistration,
+    T: TryFrom<Record, Error = WasmError> + Clone + EntryModel<ET>,
     Entry: TryFrom<T, Error = WasmError>,
+    ScopedEntryDefIndex: TryFrom<ET, Error = WasmError>,
 {
-    let id = get_origin_address( id )?;
-    let (header_hash, element) = fetch_element( &id )?;
+    let (action_hash, record) = fetch_record( id )?;
+    let _ : T = to_entry_type( record )?;
+    let delete_hash = delete_entry( action_hash )?;
 
-    check_entry_type::<T>( &element, &id )?;
-    delete_entry( header_hash.to_owned() )?;
-
-    Ok( header_hash )
+    Ok( delete_hash )
 }
 
 
 /// Get multiple entities for a given base and link tag filter
-pub fn get_entities<B, T>(id: &EntryHash, tag: Vec<u8>) -> UtilsResult<Collection<Entity<T>>>
+pub fn get_entities<T,LT,ET>(id: &EntryHash, link_type: LT, tag: Option<Vec<u8>>) -> UtilsResult<Vec<Entity<T>>>
 where
-    B: Clone + EntryModel + TryFrom<Element, Error = WasmError> + EntryDefRegistration,
-    T: Clone + EntryModel + TryFrom<Element, Error = WasmError> + EntryDefRegistration,
+    T: TryFrom<Record, Error = WasmError> + Clone + EntryModel<ET>,
+    LT: LinkTypeFilterExt,
     Entry: TryFrom<T, Error = WasmError>,
-    Entry: TryFrom<B, Error = WasmError>,
+    ScopedEntryDefIndex: TryFrom<ET, Error = WasmError>,
 {
-    match get_entity::<B>( id ) {
-	Err(UtilsError::HDKError(WasmError::Serialize(_)))
-	    | Err(UtilsError::DeserializationError(_, _)) => Err(UtilsError::LinkBaseWrongTypeError(id.to_owned(), B::entry_def_id())),
-	x => x,
-    }?;
-
     let links: Vec<Link> = get_links(
         id.to_owned(),
-	Some( LinkTag::new( tag ) )
+	link_type,
+	tag.map( |tag| LinkTag::new( tag ) )
     )?.into();
 
     let list = links.into_iter()
@@ -207,8 +210,5 @@ where
 	})
 	.collect();
 
-    Ok(Collection {
-	base: id.to_owned(),
-	items: list,
-    })
+    Ok(list)
 }

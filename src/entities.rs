@@ -1,8 +1,8 @@
-use hdk::prelude::{
-    create_link, get_links, delete_link,
-    EntryHash, HeaderHash, LinkType, LinkTag, Serialize, Deserialize,
+use std::convert::TryFrom;
+use hdk::prelude::*;
+use crate::errors::{
+    UtilsResult, UtilsError,
 };
-use crate::errors::{ UtilsResult };
 
 
 /// An Entity categorization format that required the name and model values
@@ -16,8 +16,13 @@ pub struct EntityType {
 }
 
 /// Identifies a struct as an Entity model type
-pub trait EntryModel {
+pub trait EntryModel<T>
+where
+    ScopedEntryDefIndex: TryFrom<T, Error = WasmError>,
+{
+    fn name() -> &'static str;
     fn get_type(&self) -> EntityType;
+    fn to_input(&self) -> T;
 }
 
 impl EntityType {
@@ -36,8 +41,8 @@ pub struct Entity<T> {
     /// The address of the original created entry
     pub id: EntryHash,
 
-    /// The create/update header of the current entry
-    pub header: HeaderHash,
+    /// The create/update action of the current entry
+    pub action: ActionHash,
 
     /// The address of the current entry
     pub address: EntryHash,
@@ -51,86 +56,67 @@ pub struct Entity<T> {
 }
 
 impl<T> Entity<T> {
-    /// Replace the Entity content with another content struct that implements the [EntryModel] trait
-    // TODO: As is, this method allows the entity type to change without warning even though the
-    // function name implies that only the model should change.  How can this be fixed while trying
-    // to avoid returning a Result type.
-    pub fn change_model<F, M>(&self, transformer: F) -> Entity<M>
-    where
-	T: Clone,
-	F: FnOnce(T) -> M,
-	M: EntryModel
-    {
-	let content = transformer( self.content.clone() );
-
-	Entity {
-	    id: self.id.to_owned(),
-	    header: self.header.to_owned(),
-	    address: self.address.to_owned(),
-	    ctype: content.get_type(),
-	    content: content,
-	}
-    }
-
-    /// Replace the Entity content with another content value and specify a custom model value
-    pub fn change_model_custom<F, M>(&self, transformer: F) -> Entity<M>
-    where
-	T: Clone,
-	F: FnOnce(T) -> (M, String),
-    {
-	let (content, model) = transformer( self.content.clone() );
-
-	Entity {
-	    id: self.id.to_owned(),
-	    header: self.header.to_owned(),
-	    address: self.address.to_owned(),
-	    ctype: EntityType {
-		name: self.ctype.name.to_owned(),
-		model: model,
-	    },
-	    content: content,
-	}
-    }
 
     /// Link this entity to the given base with a specific tag.  Shortcut for [`hdk::prelude::create_link`]
-    pub fn link_from(&self, base: &EntryHash, link_type: u8, tag: Vec<u8>) -> UtilsResult<HeaderHash> {
-	Ok( create_link( base.to_owned(), self.id.to_owned(), LinkType::new( link_type ), LinkTag::new( tag ) )? )
+    pub fn link_from<L,E>(&self, base: &EntryHash, link_type: L, tag_input: Option<Vec<u8>>) -> UtilsResult<ActionHash>
+    where
+	ScopedLinkType: TryFrom<L, Error = E>,
+        WasmError: From<E>,
+    {
+        Ok( match tag_input {
+	    None => create_link( base.to_owned(), self.id.to_owned(), link_type, () )?,
+	    Some(input) => create_link( base.to_owned(), self.id.to_owned(), link_type, input )?,
+	})
     }
 
     /// Link the given target to this entity with a specific tag.  Shortcut for [`hdk::prelude::create_link`]
-    pub fn link_to(&self, target: &EntryHash, link_type: u8, tag: Vec<u8>) -> UtilsResult<HeaderHash> {
-	Ok( create_link( self.id.to_owned(), target.to_owned(), LinkType::new( link_type ), LinkTag::new( tag ) )? )
+    pub fn link_to<L,E>(&self, target: &EntryHash, link_type: L, tag_input: Option<Vec<u8>>) -> UtilsResult<ActionHash>
+    where
+	ScopedLinkType: TryFrom<L, Error = E>,
+        WasmError: From<E>,
+    {
+        Ok( match tag_input {
+	    None => create_link( self.id.to_owned(), target.to_owned(), link_type, () )?,
+	    Some(input) => create_link( self.id.to_owned(), target.to_owned(), link_type, input )?,
+	})
     }
 
-    /// Delete a link matching the `current_base -[tag]-> target` and create a link with `new_base
-    /// -[tag]-> target`
-    // What happens if there are more than 1 matching links?  And is there a way to organize that
-    // ensures we don't have multiple links to the same thing?
-    pub fn move_link_from(&self, link_type: u8, tag: Vec<u8>, current_base: &EntryHash, new_base: &EntryHash) -> UtilsResult<HeaderHash> {
-	let tag = LinkTag::new( tag );
+    /// Delete an existing link from the 'current_base' and create a new link from the 'new_base'
+    pub fn move_link_from<LT,E>(&self, link_type: LT, tag_input: Option<Vec<u8>>, current_base: &EntryHash, new_base: &EntryHash) -> UtilsResult<ActionHash>
+    where
+	LT: LinkTypeFilterExt + Clone + std::fmt::Debug,
+        ScopedLinkType: TryFrom<LT, Error = E>,
+        WasmError: From<E>,
+    {
+	let tag_filter = tag_input.to_owned().map( |tag| LinkTag::new( tag ) );
 	let all_links = get_links(
-            current_base.clone(),
-	    Some( tag.clone() )
+	    current_base.clone(),
+	    link_type.to_owned(),
+	    tag_filter.to_owned(),
 	)?;
 
 	if let Some(current_link) = all_links.into_iter().find(|link| {
 	    link.target == self.id.to_owned().into()
 	}) {
-	    delete_link( current_link.create_link_hash )?;
+            delete_link( current_link.create_link_hash )?;
+	}
+	else {
+	    Err(UtilsError::UnexpectedState(format!("Aborting 'move_from_link' because existing link was not found")))?;
 	};
 
 	let new_links = get_links(
 	    new_base.clone(),
-	    Some( tag.clone() )
+	    link_type.to_owned(),
+	    tag_filter.to_owned(),
 	)?;
 
 	if let Some(existing_link) = new_links.into_iter().find(|link| {
 	    link.target == self.id.to_owned().into()
 	}) {
-	    Ok( existing_link.create_link_hash )
+            Ok( existing_link.create_link_hash )
 	}
 	else {
-	    Ok( create_link( new_base.to_owned(), self.id.to_owned(), LinkType::new( link_type ), tag )? )
+            self.link_from( new_base, link_type, tag_input )
 	}
     }
 }
@@ -144,33 +130,21 @@ pub struct Empty {}
 pub type EmptyEntity = Entity<Empty>;
 
 
-/// A list of items associated with a base EntryHash
-#[derive(Debug, Serialize)]
-pub struct Collection<T> {
-    /// The base that was used in the [`hdk::prelude::get_links`] request
-    pub base: EntryHash,
-
-    /// A list of the values relative to the link results
-    pub items: Vec<T>,
-}
-
 
 #[cfg(test)]
 pub mod tests {
     use super::*;
     use rand::Rng;
 
-    const PI_STR : &'static str = "primitive_inversed";
-
     #[test]
     fn entity_test() {
 	let bytes = rand::thread_rng().gen::<[u8; 32]>();
 	let ehash = holo_hash::EntryHash::from_raw_32( bytes.to_vec() );
-	let hhash = holo_hash::HeaderHash::from_raw_32( bytes.to_vec() );
+	let hhash = holo_hash::ActionHash::from_raw_32( bytes.to_vec() );
 
 	let item = Entity {
 	    id: ehash.clone(),
-	    header: hhash,
+	    action: hhash,
 	    address: ehash,
 	    ctype: EntityType::new( "boolean", "primitive" ),
 	    content: true,
@@ -178,34 +152,5 @@ pub mod tests {
 
 	assert_eq!( item.ctype.name, "boolean" );
 	assert_eq!( item.ctype.model, "primitive" );
-
-
-	let model = String::from( PI_STR );
-	let new_item = item.change_model_custom( |current| {
-	    ( !current, model.to_owned() )
-	});
-
-	assert_eq!( item.content, true );
-	assert_eq!( new_item.content, false );
-	assert_eq!( new_item.ctype.model, model );
-
-	#[derive(Clone)]
-	pub struct AnswerEntry {
-	    pub answer: bool,
-	}
-
-	impl EntryModel for AnswerEntry {
-	    fn get_type(&self) -> EntityType {
-		EntityType::new( "answer", PI_STR )
-	    }
-	}
-
-	let new_item = item.change_model( |current| {
-	    AnswerEntry { answer: !current }
-	});
-
-	assert_eq!( item.content, true );
-	assert_eq!( new_item.content.answer, false );
-	assert_eq!( new_item.ctype.model, model );
     }
 }

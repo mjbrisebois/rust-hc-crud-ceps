@@ -1,8 +1,8 @@
 use hdk::prelude::*;
 use hc_crud::{
-    now, get_origin_address, get_entities,
+    now, get_entities,
     create_entity, get_entity, update_entity, delete_entity,
-    Entity, Collection, EntryModel, EntityType, // EmptyEntity,
+    Entity, EntryModel, EntityType,
 };
 
 
@@ -21,19 +21,11 @@ impl GetEntityInput {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UpdateEntityInput<T> {
-    pub addr: EntryHash,
+    pub addr: ActionHash,
     pub properties: T,
 }
 
-const LT_NONE: u8 = 0;
-const TAG_POST: &'static str = "post";
-const TAG_COMMENT: &'static str = "comment";
 
-
-entry_defs![
-    PostEntry::entry_def(),
-    CommentEntry::entry_def()
-];
 
 #[hdk_extern]
 fn init(_: ()) -> ExternResult<InitCallbackResult> {
@@ -42,7 +34,7 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
 }
 
 
-#[hdk_entry(id = "post", visibility="public")]
+#[hdk_entry_helper]
 #[derive(Clone)]
 pub struct PostEntry {
     pub message: String,
@@ -50,14 +42,18 @@ pub struct PostEntry {
     pub last_updated: Option<u64>,
 }
 
-impl EntryModel for PostEntry {
+impl EntryModel<EntryTypes> for PostEntry {
+    fn name() -> &'static str { "Post" }
     fn get_type(&self) -> EntityType {
 	EntityType::new( "post", "entry" )
+    }
+    fn to_input(&self) -> EntryTypes {
+	EntryTypes::Post(self.clone())
     }
 }
 
 
-#[hdk_entry(id = "comment", visibility="public")]
+#[hdk_entry_helper]
 #[derive(Clone)]
 pub struct CommentEntry {
     pub for_post: EntryHash,
@@ -66,54 +62,58 @@ pub struct CommentEntry {
     pub last_updated: Option<u64>,
 }
 
-impl EntryModel for CommentEntry {
+impl CommentEntry {
+    pub fn to_input(&self) -> EntryTypes {
+	EntryTypes::Comment(self.clone())
+    }
+}
+
+impl EntryModel<EntryTypes> for CommentEntry {
+    fn name() -> &'static str { "Comment" }
     fn get_type(&self) -> EntityType {
 	EntityType::new( "comment", "entry" )
     }
-}
-
-#[derive(Debug, Serialize)]
-pub struct CommentInfo {
-    pub for_post: Option<Entity<PostEntry>>,
-    pub message: String,
-    pub published_at: Option<u64>,
-    pub last_updated: Option<u64>,
-}
-
-impl EntryModel for CommentInfo {
-    fn get_type(&self) -> EntityType {
-	EntityType::new( "comment", "info" )
+    fn to_input(&self) -> EntryTypes {
+	EntryTypes::Comment(self.clone())
     }
 }
 
-impl CommentEntry {
-    pub fn to_info(&self) -> CommentInfo {
-	CommentInfo {
-	    for_post: get_entity::<PostEntry>( &self.for_post ).ok(),
-	    message: self.message.to_owned(),
-	    published_at: self.published_at.to_owned(),
-	    last_updated: self.last_updated.to_owned(),
-	}
-    }
+
+#[hdk_entry_defs]
+#[unit_enum(UnitEntryTypes)]
+pub enum EntryTypes {
+    #[entry_def]
+    Post(PostEntry),
+    #[entry_def]
+    Comment(CommentEntry),
 }
+
+
+#[hdk_link_types]
+pub enum LinkTypes {
+    Post,
+    Comment,
+}
+
 
 
 // Post CRUD
 #[hdk_extern]
-pub fn create_post(mut input: PostEntry) -> ExternResult<Entity<PostEntry>> {
-    if input.published_at.is_none() {
-	input.published_at.replace( now()? );
+pub fn create_post(mut post: PostEntry) -> ExternResult<Entity<PostEntry>> {
+    if post.published_at.is_none() {
+	post.published_at.replace( now()? );
     }
 
-    debug!("Creating new post entry: {:?}", input );
-    let entity = create_entity( &input )?;
+    debug!("Creating new post entry: {:?}", post );
+    let entity = create_entity( &post )?;
 
     let pubkey = agent_info()?.agent_initial_pubkey;
 
-    entity.link_from( &pubkey.into(), LT_NONE, TAG_POST.into() )?;
+    entity.link_from( &pubkey.into(), LinkTypes::Post, None )?;
 
     Ok( entity )
 }
+
 
 
 #[hdk_extern]
@@ -143,9 +143,9 @@ pub fn update_post(mut input: UpdateEntityInput<PostEntry>) -> ExternResult<Enti
 
 
 #[hdk_extern]
-pub fn delete_post(input: GetEntityInput) -> ExternResult<HeaderHash> {
+pub fn delete_post(input: GetEntityInput) -> ExternResult<ActionHash> {
     debug!("Get Post: {:?}", input.id );
-    Ok( delete_entity::<PostEntry>( &input.id )? )
+    Ok( delete_entity::<PostEntry,EntryTypes>( &input.id )? )
 }
 
 
@@ -156,46 +156,35 @@ pub struct CreateCommentInput {
     pub comment: CommentEntry,
 }
 #[hdk_extern]
-pub fn create_comment(mut input: CreateCommentInput) -> ExternResult<Entity<CommentInfo>> {
-    let post_id = get_origin_address( &input.post_id )?;
-
+pub fn create_comment(mut input: CreateCommentInput) -> ExternResult<Entity<CommentEntry>> {
     // Check that the post exists and is not deleted
-    get_post( GetEntityInput::new( post_id.clone() ) )?;
+    get_post( GetEntityInput::new( input.post_id.clone() ) )?;
 
     if input.comment.published_at.is_none() {
 	input.comment.published_at.replace( now()? );
     }
 
     debug!("Creating new comment entry: {:?}", input.comment );
-    let entity = create_entity( &input.comment )?
-	.change_model( |comment| comment.to_info() );
+    let entity = create_entity( &input.comment )?;
 
-    entity.link_from( &post_id, LT_NONE, TAG_COMMENT.into() )?;
+    entity.link_from( &input.post_id, LinkTypes::Comment, None )?;
 
     Ok( entity )
 }
 
 
 #[hdk_extern]
-pub fn get_comment(input: GetEntityInput) -> ExternResult<Entity<CommentInfo>> {
+pub fn get_comment(input: GetEntityInput) -> ExternResult<Entity<CommentEntry>> {
     debug!("Get Post: {:?}", input.id );
     Ok(
-	get_entity::<CommentEntry>( &input.id )?
-	    .change_model( |comment| comment.to_info() )
+	get_entity( &input.id )?
     )
 }
 
 
 #[hdk_extern]
-pub fn get_comments_for_post(post_id: EntryHash) -> ExternResult<Collection<Entity<CommentEntry>>> {
-    Ok( get_entities::<PostEntry, CommentEntry, >( &post_id, TAG_COMMENT.into() )? )
-}
-
-
-// This method is for one of the failure tests; that is why it doesn't make logical sense.
-#[hdk_extern]
-pub fn get_posts_for_comment(comment_id: EntryHash) -> ExternResult<Collection<Entity<PostEntry>>> {
-    Ok( get_entities::<CommentEntry, PostEntry, >( &comment_id, TAG_COMMENT.into() )? )
+pub fn get_comments_for_post(post_id: EntryHash) -> ExternResult<Vec<Entity<CommentEntry>>> {
+    Ok( get_entities( &post_id, LinkTypes::Comment, None )? )
 }
 
 
@@ -219,9 +208,9 @@ pub fn update_comment(mut input: UpdateEntityInput<CommentEntry>) -> ExternResul
 
 
 #[hdk_extern]
-pub fn delete_comment(input: GetEntityInput) -> ExternResult<HeaderHash> {
+pub fn delete_comment(input: GetEntityInput) -> ExternResult<ActionHash> {
     debug!("Get Comment: {:?}", input.id );
-    Ok( delete_entity::<CommentEntry>( &input.id )? )
+    Ok( delete_entity::<CommentEntry,EntryTypes>( &input.id )? )
 }
 
 
@@ -231,20 +220,19 @@ pub struct LinkCommentToPostInput {
     pub post_id: EntryHash,
 }
 #[hdk_extern]
-pub fn link_comment_to_post (input: LinkCommentToPostInput) -> ExternResult<HeaderHash> {
+pub fn link_comment_to_post (input: LinkCommentToPostInput) -> ExternResult<ActionHash> {
     Ok( create_link(
 	input.post_id,
 	input.comment_id,
-	LinkType::new( LT_NONE ),
-	LinkTag::new( Vec::<u8>::from(TAG_COMMENT) )
+	LinkTypes::Comment,
+	()
     )? )
 }
 
 
-
 #[derive(Clone, Debug, Deserialize)]
 pub struct MoveCommentInput {
-    pub comment_addr: EntryHash,
+    pub comment_addr: ActionHash,
     pub post_id: EntryHash,
 }
 #[hdk_extern]
@@ -260,7 +248,7 @@ pub fn move_comment_to_post (input: MoveCommentInput) -> ExternResult<Entity<Com
     })?;
 
     debug!("Delinking previous base to ENTRY: {:?}", current_base );
-    entity.move_link_from( LT_NONE, TAG_COMMENT.into(), &current_base, &new_base )?;
+    entity.move_link_from( LinkTypes::Comment, None, &current_base, &new_base )?;
 
     Ok( entity )
 }

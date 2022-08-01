@@ -50,16 +50,19 @@ let create_comment_input_2		= {
 function basic_tests () {
     it("should test 'create_entity'", async function () {
 	post				= await clients.alice.callEntity( "happy_path", "happy_path", "create_post", create_post_input );
+	// console.log( json.debug(post) )
 
 	expect( post.message		).to.equal( create_post_input.message );
 
 	post2				= await clients.alice.callEntity( "happy_path", "happy_path", "create_post", create_post_input );
+	// console.log( json.debug(post2) )
     });
 
     it("should test 'get_entity'", async function () {
 	post				= await clients.alice.callEntity( "happy_path", "happy_path", "get_post", {
 	    "id": post.$id,
 	});
+	// console.log( json.debug(post) )
 
 	expect( post.message		).to.equal( create_post_input.message );
     });
@@ -71,19 +74,21 @@ function basic_tests () {
 
 	let prev_post			= post2;
 	post2				= await clients.alice.callEntity( "happy_path", "happy_path", "update_post", {
-	    "addr": post2.$addr,
+	    "addr": post2.$action,
 	    "properties": input,
 	});
+	// console.log( json.debug(post2) )
 
 	expect( post2.message		).to.equal( input.message );
-	expect( post2.$header		).to.not.deep.equal( prev_post.$header );
+	expect( post2.$action		).to.not.deep.equal( prev_post.$action );
 
 	post2				= await clients.alice.callEntity( "happy_path", "happy_path", "get_post", {
 	    "id": post2.$id,
 	});
+	// console.log( json.debug(post2) )
 
 	expect( post2.message		).to.equal( input.message );
-	expect( post2.$header		).to.not.deep.equal( prev_post.$header );
+	expect( post2.$action		).to.not.deep.equal( prev_post.$action );
     });
 
     it("should test 'Collection'", async function () {
@@ -96,7 +101,7 @@ function basic_tests () {
 	    });
 
 	    expect( comment.message		).to.equal( create_comment_input_1.message );
-	    expect( comment.for_post.$id	).to.deep.equal( post.$id );
+	    expect( comment.for_post		).to.deep.equal( post.$id );
 
 	    create_comment_input_2.for_post = post2.$id;
 	    comment2			= await clients.alice.callEntity( "happy_path", "happy_path", "create_comment", {
@@ -111,7 +116,7 @@ function basic_tests () {
 	    });
 
 	    expect( comment.message		).to.equal( create_comment_input_1.message );
-	    expect( comment.for_post.$id	).to.deep.equal( post.$id );
+	    expect( comment.for_post		).to.deep.equal( post.$id );
 	}
 
 	{
@@ -127,21 +132,21 @@ function basic_tests () {
 
 	    let prev_comment		= comment;
 	    comment			= await clients.alice.callEntity( "happy_path", "happy_path", "update_comment", {
-		"addr": comment.$addr,
+		"addr": comment.$action,
 		"properties": input,
 	    });
 
-	    expect( comment.$header	).to.not.deep.equal( prev_comment.$header );
+	    expect( comment.$action	).to.not.deep.equal( prev_comment.$action );
 
 	    let comments		= await clients.alice.callCollection( "happy_path", "happy_path", "get_comments_for_post", post.$id );
 
 	    expect( comments		).to.have.length( 1 );
 	    expect( comments[0].message	).to.equal( input.message );
-	    expect( comments[0].$header	).to.not.deep.equal( prev_comment.$header );
+	    expect( comments[0].$action	).to.not.deep.equal( prev_comment.$action );
 	}
 
 	{
-	    await clients.alice.callEntity( "happy_path", "happy_path", "link_comment_to_post", {
+	    await clients.alice.call( "happy_path", "happy_path", "link_comment_to_post", {
 		"comment_id": comment.$id,
 		"post_id": post2.$id,
 	    });
@@ -153,7 +158,7 @@ function basic_tests () {
 
 	{
 	    comment			= await clients.alice.callEntity( "happy_path", "happy_path", "move_comment_to_post", {
-		"comment_addr": comment.$addr,
+		"comment_addr": comment.$action,
 		"post_id": post2.$id,
 	    });
 
@@ -184,35 +189,35 @@ function basic_tests () {
 	    "id": post.$id,
 	});
 
-	expect( delete_hash		).to.be.a("HeaderHash");
+	expect( delete_hash		).to.be.a("ActionHash");
     });
 }
 
 function errors_tests () {
     it("should fail to 'get_entity' because address is wrong entry type", async function () {
 	await expect_reject( async () => {
-	    await clients.alice.callEntity( "happy_path", "happy_path", "get_post", {
+	    let resp = await clients.alice.callEntity( "happy_path", "happy_path", "get_post", {
 		"id": comment2.$id,
 	    });
-	}, RibosomeError, "Deserialized entry to wrong type" );
+	}, RibosomeError, "Deserialized entry to wrong type: expected 0/0 but found 0/1" );
     });
 
     it("should fail to update because of wrong entry type", async function () {
 	await expect_reject( async () => {
 	    await clients.alice.callEntity( "happy_path", "happy_path", "update_comment", {
-		"addr": post2.$addr,
+		"addr": post2.$action,
 		"properties": create_comment_input_1,
 	    });
-	}, RibosomeError, "Failed to deserialize entry to type" );
+	}, RibosomeError, "Failed to deserialize to entry type 'Comment'" );
     });
 
     it("should fail to update because mismatched type", async function () {
 	await expect_reject( async () => {
 	    await clients.alice.callEntity( "happy_path", "happy_path", "update_post", {
-		"addr": comment2.$addr,
+		"addr": comment2.$action,
 		"properties": create_post_input,
 	    });
-	}, RibosomeError, "Deserialized entry to wrong type" );
+	}, RibosomeError, "Deserialized entry to wrong type: expected 0/0 but found 0/1" );
     });
 
     it("should fail to create comment because post is deleted", async function () {
@@ -221,7 +226,7 @@ function errors_tests () {
 		"post_id": post.$id,
 		"comment": create_comment_input_1,
 	    });
-	}, RibosomeError, "Entry not found for address" );
+	}, RibosomeError, "Record not found for Entry address" );
     });
 
     it("should fail to delete because wrong type", async function () {
@@ -229,7 +234,7 @@ function errors_tests () {
 	    await clients.alice.callEntity( "happy_path", "happy_path", "delete_comment", {
 		"id": post2.$addr,
 	    });
-	}, RibosomeError, "Failed to deserialize entry to type" );
+	}, RibosomeError, "Failed to deserialize to entry type 'Comment'" );
     });
 
     it("should fail to delete because mismatched type", async function () {
@@ -237,7 +242,7 @@ function errors_tests () {
 	    await clients.alice.call( "happy_path", "happy_path", "delete_post", {
 		"id": comment2.$id,
 	    });
-	}, RibosomeError, "Deserialized entry to wrong type" );
+	}, RibosomeError, "Deserialized entry to wrong type: expected 0/0 but found 0/1" );
     });
 
     it("should fail to get because address is an 'update', not an 'origin' entry", async function () {
@@ -245,13 +250,7 @@ function errors_tests () {
 	    await clients.alice.call( "happy_path", "happy_path", "get_post", {
 		"id": post2.$addr,
 	    });
-	}, RibosomeError, "is an 'update'; Use origin address" );
-    });
-
-    it("should fail to get because ", async function () {
-	await expect_reject( async () => {
-	    await clients.alice.call( "happy_path", "happy_path", "get_posts_for_comment", post2.$id );
-	}, RibosomeError, "is not the expected type: App" );
+	}, RibosomeError, "is not a Create action type" );
     });
 }
 

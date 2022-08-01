@@ -1,10 +1,5 @@
-
-use std::convert::TryFrom;
-use hdk::prelude::{
-    debug, sys_time, hash_entry,
-    Element, Entry, Link, EntryHash, WasmError, Path,
-    EntryDefRegistration,
-};
+use hdk::prelude::*;
+use crate::entities::{ EntryModel };
 use crate::errors::{ UtilsResult, UtilsError };
 
 /// Get the current unix timestamp
@@ -30,11 +25,11 @@ pub fn find_latest_link(links: Vec<Link>) -> Option<Link> {
        })
 }
 
-/// Verify an element's entry is the expected entry type
+
+/// Verify a Record's entry is the expected entry type
 ///
 /// - `T` - the expected entry type
-/// - `element` - an Element expected to have an App entry
-/// - `addr` - the expected hash of the entry contents
+/// - `record` - a Record expected to have an App entry
 ///
 /// An entry type check could fail with:
 ///
@@ -42,49 +37,33 @@ pub fn find_latest_link(links: Vec<Link>) -> Option<Link> {
 /// - [`UtilsError::WrongEntryTypeError`] - indicating that the successful deserialization was a coincidence
 ///
 /// ```ignore
-/// check_entry_type::<PostEntry>( &element, &expected_hash )?
+/// let entry : T = to_entry_type( &record, &expected_hash )?
 /// ```
-pub fn check_entry_type<T>(element: &Element, addr: &EntryHash) -> UtilsResult<T>
+pub fn to_entry_type<T,ET>(record: Record) -> UtilsResult<T>
 where
-    T: Clone + TryFrom<Element, Error = WasmError> + EntryDefRegistration,
-    Entry: TryFrom<T, Error = WasmError>,
+    T: EntryModel<ET>,
+    T: TryFrom<Record, Error = WasmError> + Clone,
+    ScopedEntryDefIndex: TryFrom<ET, Error = WasmError>,
 {
-    // TODO: Compare element entry type to updated entry type rather than this hack way of rehashing
-    // the entry.
-    //
-    // If rehashing does not result in the same entry hash, that means the entry bytes
-    // coincidentally deserialized into the expected struct.  Some fields would be missing which
-    // results in a different hash.
-    //
-    // UPDATE:
-    //
-    //     The 'entry_defs()` method used to convert an entry def index to an entry def ID is
-    //     defined by the 'entry_defs!' macro (see holochain/crates/hdk/src/entry.rs).  Which means
-    //     it can't be accessed by this function.  It seems the only option would be to have an
-    //     entry type registration function to pass this library the
-    //     hdk::prelude::EntryDefsCallbackResult so it can be used by this method.  I don't like the
-    //     idea of requiring that registration, so it could be an optional optimization where the
-    //     current code is the default check.
+    let content = T::try_from( record.clone() )
+	.map_err(|_| UtilsError::DeserializationError( T::name(), record.action().entry_type().map(|et| et.to_owned())) )?;
+    let scoped_def = ScopedEntryDefIndex::try_from( content.to_input() )?;
 
-    debug!("Checking that element entry type {:?} matches expected type {:?}", element.header().entry_type(), T::entry_def() );
-    let entry = match T::try_from( element.clone() ) {
-	Ok(entry) => entry,
-	Err(_) => {
-	    return Err(UtilsError::DeserializationError( addr.to_owned(), T::entry_def_id() ));
-	},
-    };
-
-    let entry_hash = hash_entry( entry.clone() )?;
-
-    debug!("Verifiying deserialized entry hashes matches expected hash: {:?} == {:?}", entry_hash, addr );
-    if *addr != entry_hash {
-	return Err(UtilsError::WrongEntryTypeError( addr.to_owned(), entry_hash, T::entry_def_id() ));
+    if let Some(EntryType::App(AppEntryType {zome_id, id, ..})) = record.action().entry_type() {
+	if *zome_id == scoped_def.zome_id && *id == scoped_def.zome_type {
+	    Ok(content)
+	}
+	else {
+	    Err(UtilsError::WrongEntryTypeError(scoped_def.zome_id, scoped_def.zome_type, zome_id.to_owned(), id.to_owned()))?
+	}
     }
-
-    Ok( entry )
+    else {
+	Err(UtilsError::RecordHasNoEntry(record.action_address().to_owned(), record.action().action_type()))?
+    }
 }
 
 
+/// Create a Path from any iterable list of items that implement the Display trait
 pub fn path_from_collection<T>(segments: T) -> UtilsResult<Path>
 where
     T: IntoIterator,
@@ -98,6 +77,32 @@ where
 
     Ok( Path::from( components ) )
 }
+
+
+fn trace_action_history_with_chain(action_hash: &ActionHash, history: Option<Vec<(ActionHash,EntryHash)>>) -> UtilsResult<Vec<(ActionHash,EntryHash)>> {
+    let sh_action = must_get_action( action_hash.to_owned().into() )?;
+    let mut history = history.unwrap_or( Vec::new() );
+
+    match sh_action.action() {
+	Action::Create(create) => {
+	    history.push( (action_hash.to_owned(), create.entry_hash.to_owned()) );
+
+	    Ok( history )
+	},
+	Action::Update(update) => {
+	    history.push( (action_hash.to_owned(), update.entry_hash.to_owned()) );
+
+	    trace_action_history_with_chain( &update.original_action_address, Some(history) )
+	},
+	action => Err(wasm_error!(WasmErrorInner::Guest(format!("Unexpected action type @ trace depth {}: {:?}", history.len(), action ))))?,
+    }
+}
+
+/// Follow the Action's origin until we find the Create Action.
+pub fn trace_action_history(action_hash: &ActionHash) -> UtilsResult<Vec<(ActionHash,EntryHash)>> {
+    trace_action_history_with_chain(action_hash, None)
+}
+
 
 
 #[cfg(test)]
