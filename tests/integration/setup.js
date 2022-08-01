@@ -27,13 +27,6 @@ CommentEntity.model("entry", content => {
 
     return content;
 });
-CommentEntity.model("info", content => {
-    content.for_post		= schema.deconstruct( "entity", content.for_post );
-    content.published_at	= new Date( content.published_at );
-    content.last_updated	= new Date( content.last_updated );
-
-    return content;
-});
 
 const schema				= new Architecture([ PostEntity, CommentEntity ]);
 
@@ -60,7 +53,7 @@ class Client extends AgentClient {
 	let resp			= await this.call( ...args );
 
 	try {
-	    return schema.deconstruct( "entity_collection", resp );
+	    return resp.map( entity => schema.deconstruct( "entity", entity ) );
 	} catch (err) {
 	    console.log( err );
 	}

@@ -1,7 +1,9 @@
 manifest_version: "1"
 name: happy_path
-uuid: 00000000-0000-0000-0000-000000000000
-properties: ~
-zomes:
-  - name: happy_path
-    bundled: ../../zomes/happy_path.wasm
+integrity:
+  uuid: 00000000-0000-0000-0000-000000000000
+  properties: ~
+  origin_time: 2022-07-21T00:00:00.000000Z
+  zomes:
+    - name: happy_path
+      bundled: ../../zomes/happy_path.wasm
