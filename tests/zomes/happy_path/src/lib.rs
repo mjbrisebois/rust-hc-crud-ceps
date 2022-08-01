@@ -105,7 +105,7 @@ pub fn create_post(mut post: PostEntry) -> ExternResult<Entity<PostEntry>> {
     }
 
     debug!("Creating new post entry: {:?}", post );
-    let entity = create_entity( &post, post.to_input() )?;
+    let entity = create_entity( &post )?;
 
     let pubkey = agent_info()?.agent_initial_pubkey;
 
@@ -135,7 +135,7 @@ pub fn update_post(mut input: UpdateEntityInput<PostEntry>) -> ExternResult<Enti
 
 	new_post.published_at = previous.published_at;
 
-	Ok( (new_post.clone(), new_post.to_input()) )
+	Ok( new_post )
     })?;
 
     Ok( entity )
@@ -165,7 +165,7 @@ pub fn create_comment(mut input: CreateCommentInput) -> ExternResult<Entity<Comm
     }
 
     debug!("Creating new comment entry: {:?}", input.comment );
-    let entity = create_entity( &input.comment, input.comment.to_input() )?;
+    let entity = create_entity( &input.comment )?;
 
     entity.link_from( &input.post_id, LinkTypes::Comment, None )?;
 
@@ -200,7 +200,7 @@ pub fn update_comment(mut input: UpdateEntityInput<CommentEntry>) -> ExternResul
 
 	new_comment.published_at = previous.published_at;
 
-	Ok( (new_comment.clone(), new_comment.to_input()) )
+	Ok( new_comment )
     })?;
 
     Ok( entity )
@@ -244,7 +244,7 @@ pub fn move_comment_to_post (input: MoveCommentInput) -> ExternResult<Entity<Com
 	current_base = previous.for_post;
 	previous.for_post = new_base.to_owned();
 
-	Ok( (previous.clone(), previous.to_input()) )
+	Ok( previous )
     })?;
 
     debug!("Delinking previous base to ENTRY: {:?}", current_base );

@@ -96,7 +96,7 @@ pub fn fetch_record_latest(id: &EntryHash) -> UtilsResult<(ActionHash, Record)> 
 
 
 /// Create a new entity
-pub fn create_entity<T,I,E>(entry: &T, input: I) -> UtilsResult<Entity<T>>
+pub fn create_entity<T,I,E>(entry: &T) -> UtilsResult<Entity<T>>
 where
     ScopedEntryDefIndex: for<'a> TryFrom<&'a I, Error = E>,
     ScopedEntryDefIndex: TryFrom<I, Error = WasmError>,
@@ -107,7 +107,7 @@ where
     T: Clone + EntryModel<I>,
 {
     let entry_hash = hash_entry( entry.to_owned() )?;
-    let action_hash = create_entry( input )?;
+    let action_hash = create_entry( entry.to_input() )?;
 
     Ok(Entity {
 	id: entry_hash.to_owned(),
@@ -152,7 +152,7 @@ where
     WasmError: From<E>,
     T: TryFrom<Record, Error = WasmError>,
     T: Clone + EntryModel<I>,
-    F: FnOnce(T, Record) -> UtilsResult<(T,I)>,
+    F: FnOnce(T, Record) -> UtilsResult<T>,
 {
     // TODO: provide automatic check that the given address is the latest one or an optional flag
     // to indicate the intension to branch from an older update.
@@ -161,10 +161,10 @@ where
 	.ok_or( UtilsError::ActionNotFoundError(addr.to_owned(), Some("Given origin for update is not found".to_string())) )?;
 
     let current : T = to_entry_type( record.clone() )?;
-    let (updated_entry, updated_input) = callback( current, record.clone() )?;
+    let updated_entry = callback( current, record.clone() )?;
 
     let entry_hash = hash_entry( updated_entry.to_owned() )?;
-    let action_hash = update_entry( addr.to_owned(), updated_input )?;
+    let action_hash = update_entry( addr.to_owned(), updated_entry.to_input() )?;
 
     Ok(Entity {
 	id: id,
