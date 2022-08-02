@@ -1,7 +1,7 @@
 use hdk::prelude::*;
 use hc_crud::{
-    now, get_entities,
-    create_entity, get_entity, update_entity, delete_entity,
+    now,
+    create_entity, get_entity, get_entities, update_entity, delete_entity,
     Entity, EntryModel, EntityType,
 };
 

@@ -25,12 +25,12 @@ Example of adding to `Cargo.toml`
 hc_crud_ceps = "0.3.0"
 ```
 
-Example of importing into your Rust file
+Example of common imports
 ```rust
 use hc_crud::{
-    now, get_origin_address, fetch_element, fetch_element_latest,
-    create_entity, get_entity, update_entity, delete_entity, get_entities,
-    Entity, Collection, EntryModel, EntityType,
+    now,
+    create_entity, get_entity, get_entities, update_entity, delete_entity,
+    Entity, EntryModel, EntityType,
 };
 ```
 
@@ -43,11 +43,11 @@ These imports and structs are assumed for all examples
 use hdk::prelude::*;
 use hc_crud::{
     now,
-    create_entity, get_entity, update_entity, delete_entity, get_entities,
-    Entity, Collection, EntryModel, EntityType,
+    create_entity, get_entity, get_entities, update_entity, delete_entity,
+    Entity, EntryModel, EntityType,
 };
 
-#[hdk_entry(id = "post", visibility="public")]
+#[hdk_entry_helper]
 #[derive(Clone)]
 pub struct PostEntry {
     pub title: String,
@@ -56,9 +56,20 @@ pub struct PostEntry {
     pub last_updated: Option<u64>,
 }
 
-impl EntryModel for PostEntry {
+#[hdk_entry_defs]
+#[unit_enum(UnitEntryTypes)]
+pub enum EntryTypes {
+    #[entry_def]
+    Post(PostEntry),
+}
+
+impl EntryModel<EntryTypes> for PostEntry {
+    fn name() -> &'static str { "Post" }
     fn get_type(&self) -> EntityType {
         EntityType::new( "post", "entry" )
+    }
+    fn to_input(&self) -> EntryTypes {
+        EntryTypes::Post(self.clone())
     }
 }
 ```
@@ -99,7 +110,7 @@ let post_entity = update_entity( &entity.address, |mut previous: PostEntry, _| {
 
 Example
 ```rust
-delete_entity::<PostEntry>( &entity.id )?;
+delete_entity::<PostEntry,EntryTypes>( &entity.id )?;
 ```
 
 
@@ -108,7 +119,7 @@ Create a 1-to-many relationship for post entries to have comment entries.
 
 The following examples use this additional struct
 ```rust
-#[hdk_entry(id = "comment", visibility="public")]
+#[hdk_entry_helper]
 #[derive(Clone)]
 pub struct CommentEntry {
     pub message: String,
@@ -116,16 +127,36 @@ pub struct CommentEntry {
     pub last_updated: Option<u64>,
 }
 
-impl EntryModel for CommentEntry {
+impl EntryModel<EntryTypes> for CommentEntry {
+    fn name() -> &'static str { "Comment" }
     fn get_type(&self) -> EntityType {
         EntityType::new( "comment", "entry" )
+    }
+    fn to_input(&self) -> EntryTypes {
+        EntryTypes::Comment(self.clone())
     }
 }
 ```
 
+Add `CommentEntry` to `EntryTypes` enum
+```diff
+ #[hdk_entry_defs]
+ #[unit_enum(UnitEntryTypes)]
+ pub enum EntryTypes {
+     #[entry_def]
+     Post(PostEntry),
++    #[entry_def]
++    Comment(CommentEntry),
+ }
+```
+
 Create a `CommentEntry` and link it to the `PostEntry`
 ```rust
-const TAG_COMMENT: &'static str = "comment";
+#[hdk_link_types]
+pub enum LinkTypes {
+    Post,
+    Comment,
+}
 
 let input = CommentEntry {
     message: String::from("Where is the sun?"),
@@ -135,12 +166,12 @@ let input = CommentEntry {
 
 let comment_entity = create_entity( &input )?;
 
-comment_entity.link_from( &post_entity.id, TAG_COMMENT.into() )?;
+comment_entity.link_from( &post_entity.id, LinkTypes::Comment, None )?;
 ```
 
 Get a `Collection` for a specific base and tag
 ```rust
-let collection = get_entities::<PostEntry, CommentEntry>( &post_entity.id, TAG_COMMENT.into() )?;
+let collection : Vec<Entity<CommentEntry>> = get_entities( &post_entity.id, LinkTypes::Comment, None )?;
 ```
 
 

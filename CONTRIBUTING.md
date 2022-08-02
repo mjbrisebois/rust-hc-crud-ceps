@@ -10,7 +10,6 @@ This package is designed to work with Holochain's Conductor API interfaces.
 
 ### Environment
 
-- Developed using `rustc 1.55.0 (c8dfcfe04 2021-09-06)`
 - Enter `nix-shell` for other development environment dependencies.
 
 ### Building
