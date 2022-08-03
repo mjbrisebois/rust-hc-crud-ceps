@@ -36,7 +36,8 @@ pub fn fetch_record(addr: &EntryHash) -> UtilsResult<(ActionHash, Record)> {
     Ok( (record.action_address().to_owned(), record) )
 }
 
-fn find_earliest_update(updates: Vec<SignedHashed<Action>>) -> Option<SignedHashed<Action>> {
+/// Finds and returns the Action with the earliest timestamp from a list
+pub fn find_earliest_action(updates: Vec<SignedHashed<Action>>) -> Option<SignedHashed<Action>> {
     if updates.len() == 0 {
 	None
     }
@@ -70,7 +71,7 @@ pub fn follow_updates(hash: &ActionHash, trace: Option<Vec<ActionHash>>) -> Util
 	Details::Entry(details) => details.updates,
     };
 
-    Ok( match find_earliest_update( updates ) {
+    Ok( match find_earliest_action( updates ) {
 	None => history,
 	Some(next_update) => follow_updates( next_update.action_address(), Some(history) )?,
     })
