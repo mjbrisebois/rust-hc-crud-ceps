@@ -199,11 +199,13 @@ where
     Entry: TryFrom<T, Error = WasmError>,
     ScopedEntryDefIndex: TryFrom<ET, Error = WasmError>,
 {
-    let links: Vec<Link> = get_links(
+    let links_result = get_links(
         id.to_owned(),
 	link_type,
 	tag.map( |tag| LinkTag::new( tag ) )
-    )?.into();
+    );
+    debug!("get_entities: {:?}", links_result );
+    let links = links_result?;
 
     let list = links.into_iter()
 	.filter_map(|link| {
