@@ -99,8 +99,7 @@ pub fn fetch_record_latest(id: &EntryHash) -> UtilsResult<(ActionHash, Record)> 
 /// Create a new entity
 pub fn create_entity<T,I,E>(entry: &T) -> UtilsResult<Entity<T>>
 where
-    ScopedEntryDefIndex: for<'a> TryFrom<&'a I, Error = E>,
-    ScopedEntryDefIndex: TryFrom<I, Error = WasmError>,
+    ScopedEntryDefIndex: for<'a> TryFrom<&'a I, Error = WasmError>,
     EntryVisibility: for<'a> From<&'a I>,
     Entry: TryFrom<I, Error = E>,
     Entry: TryFrom<T, Error = E>,
@@ -124,7 +123,7 @@ pub fn get_entity<I,ET>(id: &EntryHash) -> UtilsResult<Entity<I>>
 where
     I: TryFrom<Record, Error = WasmError> + Clone + EntryModel<ET>,
     Entry: TryFrom<I, Error = WasmError>,
-    ScopedEntryDefIndex: TryFrom<ET, Error = WasmError>,
+    ScopedEntryDefIndex: for<'a> TryFrom<&'a ET, Error = WasmError>,
 {
     let (_, record) = fetch_record_latest( id )?;
     let to_type_input = record.to_owned();
@@ -147,7 +146,7 @@ where
 /// Update an entity
 pub fn update_entity<T,I,F,E>(addr: &ActionHash, callback: F) -> UtilsResult<Entity<T>>
 where
-    ScopedEntryDefIndex: TryFrom<I, Error = WasmError>,
+    ScopedEntryDefIndex: for<'a> TryFrom<&'a I, Error = WasmError>,
     Entry: TryFrom<I, Error = E>,
     Entry: TryFrom<T, Error = E>,
     WasmError: From<E>,
@@ -181,7 +180,7 @@ pub fn delete_entity<T,ET>(id: &EntryHash) -> UtilsResult<ActionHash>
 where
     T: TryFrom<Record, Error = WasmError> + Clone + EntryModel<ET>,
     Entry: TryFrom<T, Error = WasmError>,
-    ScopedEntryDefIndex: TryFrom<ET, Error = WasmError>,
+    ScopedEntryDefIndex: for<'a> TryFrom<&'a ET, Error = WasmError>,
 {
     let (action_hash, record) = fetch_record( id )?;
     let _ : T = to_entry_type( record )?;
@@ -197,7 +196,7 @@ where
     T: TryFrom<Record, Error = WasmError> + Clone + EntryModel<ET>,
     LT: LinkTypeFilterExt,
     Entry: TryFrom<T, Error = WasmError>,
-    ScopedEntryDefIndex: TryFrom<ET, Error = WasmError>,
+    ScopedEntryDefIndex: for<'a> TryFrom<&'a ET, Error = WasmError>,
 {
     let links_result = get_links(
         id.to_owned(),

@@ -18,7 +18,7 @@ pub struct EntityType {
 /// Identifies a struct as an Entity model type
 pub trait EntryModel<T>
 where
-    ScopedEntryDefIndex: TryFrom<T, Error = WasmError>,
+    ScopedEntryDefIndex: for<'a> TryFrom<&'a T, Error = WasmError>,
 {
     fn name() -> &'static str;
     fn get_type(&self) -> EntityType;
