@@ -18,7 +18,7 @@ pub enum UtilsError {
 
     /// This indicates that the deserialized EntryType and the Record EntryType do not match
     #[error("Deserialized entry to wrong type: expected {}/{} but found {}/{} (zome/entry)", (.0).0, (.1).0, (.2).0, (.3).0 )]
-    WrongEntryTypeError(ZomeId, EntryDefIndex, ZomeId, EntryDefIndex),
+    WrongEntryTypeError(ZomeIndex, EntryDefIndex, ZomeIndex, EntryDefIndex),
 
     /// A Record was expected to have an App Entry but it does not
     #[error("The Record @ {1} has the action type {0}; expected a Create or Update type")]

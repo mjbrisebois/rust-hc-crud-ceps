@@ -49,12 +49,12 @@ where
 	.map_err(|_| UtilsError::DeserializationError( T::name(), record.action().entry_type().map(|et| et.to_owned())) )?;
     let scoped_def = ScopedEntryDefIndex::try_from( &content.to_input() )?;
 
-    if let Some(EntryType::App(AppEntryType {zome_id, id, ..})) = record.action().entry_type() {
-	if *zome_id == scoped_def.zome_id && *id == scoped_def.zome_type {
+    if let Some(EntryType::App(AppEntryDef {zome_index, entry_index, ..})) = record.action().entry_type() {
+	if *zome_index == scoped_def.zome_index && *entry_index == scoped_def.zome_type {
 	    Ok(content)
 	}
 	else {
-	    Err(UtilsError::WrongEntryTypeError(scoped_def.zome_id, scoped_def.zome_type, zome_id.to_owned(), id.to_owned()))?
+	    Err(UtilsError::WrongEntryTypeError(scoped_def.zome_index, scoped_def.zome_type, zome_index.to_owned(), entry_index.to_owned()))?
 	}
     }
     else {
