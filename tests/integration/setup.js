@@ -93,13 +93,15 @@ async function backdrop ( holochain, dnas, actors, client_options ) {
     const clients			= {};
 
     log.debug("Waiting for DNAs and actors to be set up...");
-    const agents			= await holochain.backdrop( app_id, app_port, dnas, actors );
+    const agents			= await holochain.backdrop( app_id, app_port, dnas, actors, {
+	"timeout": 5_000,
+    });
 
     log.debug("Creating clients actors: %s", actors.join(", ") );
     await Promise.all( Object.entries( agents ).map( async ([ actor, happ ]) => {
 	const dna_map			= {};
 	await Promise.all( Object.entries( happ.cells ).map( async ([ nick, cell ]) => {
-	    dna_map[nick]		= cell.dna.hash;
+	    dna_map[nick]		= cell.dna;
 	    log.info("Established a new cell for '%s': %s => [ %s :: %s ]", actor, nick, String(cell.dna.hash), String(happ.agent) );
 	}) );
 
