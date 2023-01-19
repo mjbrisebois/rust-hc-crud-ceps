@@ -102,7 +102,7 @@ async function backdrop ( holochain, dnas, actors, client_options ) {
 	const dna_map			= {};
 	await Promise.all( Object.entries( happ.cells ).map( async ([ nick, cell ]) => {
 	    dna_map[nick]		= cell.dna;
-	    log.info("Established a new cell for '%s': %s => [ %s :: %s ]", actor, nick, String(cell.dna.hash), String(happ.agent) );
+	    log.info("Established a new cell for '%s': %s => [ %s :: %s ]", actor, nick, String(cell.dna), String(happ.agent) );
 	}) );
 
 	const client			= new Client( happ.agent, dna_map, app_port, client_options );

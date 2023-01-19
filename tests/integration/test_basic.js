@@ -264,7 +264,7 @@ describe("CEPS", () => {
 	clients				= await backdrop( holochain, {
 	    "happy_path": {
 		"path": DNA_PATH,
-		"zomes": {
+		"granted_functions": {
 		    "happy_path": [
 			"create_post", "get_post", "update_post", "delete_post",
 			"create_comment", "get_comment", "update_comment", "delete_comment",
