@@ -262,16 +262,7 @@ describe("CEPS", () => {
 	this.timeout( 30_000 );
 
 	clients				= await backdrop( holochain, {
-	    "happy_path": {
-		"path": DNA_PATH,
-		"granted_functions": {
-		    "happy_path": [
-			"create_post", "get_post", "update_post", "delete_post",
-			"create_comment", "get_comment", "update_comment", "delete_comment",
-			"get_comments_for_post", "move_comment_to_post", "link_comment_to_post",
-		    ],
-		},
-	    },
+	    "happy_path": DNA_PATH,
 	}, [
 	    "alice",
 	]);

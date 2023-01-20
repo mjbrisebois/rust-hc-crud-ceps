@@ -71,14 +71,6 @@ test-docs:
 build-docs:			test-docs
 	cargo doc
 
-PRE_HDK_VERSION = "0.1.0-beta-rc.0"
-NEW_HDK_VERSION = "0.1.0-beta-rc.2"
-
-GG_REPLACE_LOCATIONS = ':(exclude)*.lock' Cargo.toml tests/zomes/
-
-update-hdk-version:
-	git grep -l '$(PRE_HDK_VERSION)' -- $(GG_REPLACE_LOCATIONS) | xargs sed -i 's|$(PRE_HDK_VERSION)|$(NEW_HDK_VERSION)|g'
-
 
 #
 # Repository
@@ -93,3 +85,11 @@ clean-files-all:	clean-remove-chaff
 	git clean -ndx
 clean-files-all-force:	clean-remove-chaff
 	git clean -fdx
+
+PRE_HDK_VERSION = "0.1.0-beta-rc.0"
+NEW_HDK_VERSION = "0.1.0-beta-rc.2"
+
+GG_REPLACE_LOCATIONS = ':(exclude)*.lock' Cargo.toml tests/zomes/
+
+update-hdk-version:
+	git grep -l '$(PRE_HDK_VERSION)' -- $(GG_REPLACE_LOCATIONS) | xargs sed -i 's|$(PRE_HDK_VERSION)|$(NEW_HDK_VERSION)|g'
