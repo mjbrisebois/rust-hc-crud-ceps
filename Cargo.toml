@@ -1,6 +1,6 @@
 [package]
 name = "hc_crud_ceps"
-version = "0.73.0"
+version = "0.74.0"
 authors = ["Matthew Brisebois <matthew.brisebois@holo.host>"]
 edition = "2018"
 license = "CAL-1.0"
