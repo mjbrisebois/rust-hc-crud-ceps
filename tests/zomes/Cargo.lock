@@ -716,7 +716,7 @@ dependencies = [
 
 [[package]]
 name = "hc_crud_ceps"
-version = "0.74.0"
+version = "0.75.0"
 dependencies = [
  "hdk",
  "holo_hash",
