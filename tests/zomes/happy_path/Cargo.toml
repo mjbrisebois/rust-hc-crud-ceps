@@ -1,6 +1,6 @@
 [package]
 name = "happy_path"
-version = "0.1.0"
+version = "0.2.0-beta-rc.1"
 edition = "2018"
 
 [lib]
@@ -9,5 +9,5 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 hc_crud_ceps = { path = "../../../" }
-hdk = "0.1.0"
+hdk = "0.2.0-beta-rc.1"
 serde = "1"

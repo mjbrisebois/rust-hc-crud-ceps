@@ -86,10 +86,14 @@ clean-files-all:	clean-remove-chaff
 clean-files-all-force:	clean-remove-chaff
 	git clean -fdx
 
-PRE_HDK_VERSION = "0.1.0-beta-rc.3"
-NEW_HDK_VERSION = "0.1.0"
+PRE_HDK_VERSION = "0.1.0"
+NEW_HDK_VERSION = "0.2.0-beta-rc.1"
+
+PRE_HH_VERSION = "0.1.0-beta-rc.1", features
+NEW_HH_VERSION = "0.2.0-beta-rc.1", features
 
 GG_REPLACE_LOCATIONS = ':(exclude)*.lock' Cargo.toml tests/zomes/
 
 update-hdk-version:
+	git grep -l '$(PRE_HH_VERSION)' -- $(GG_REPLACE_LOCATIONS) | xargs sed -i 's|$(PRE_HH_VERSION)|$(NEW_HH_VERSION)|g'
 	git grep -l '$(PRE_HDK_VERSION)' -- $(GG_REPLACE_LOCATIONS) | xargs sed -i 's|$(PRE_HDK_VERSION)|$(NEW_HDK_VERSION)|g'
