@@ -10,21 +10,21 @@ preview-crate:			test-debug
 publish-crate:			test-debug
 	CARGO_HOME=$(HOME)/.cargo cargo publish
 
-use-local-holochain-backdrop:
+use-local-backdrop:
 	cd tests; npm uninstall @whi/holochain-backdrop
 	cd tests; npm install --save-dev ../../node-holochain-backdrop
-use-npm-holochain-backdrop:
+use-npm-backdrop:
 	cd tests; npm uninstall @whi/holochain-backdrop
 	cd tests; npm install --save-dev @whi/holochain-backdrop
-use-local-holochain-client:
+use-local-client:
 	cd tests; npm uninstall @whi/holochain-client
-	cd tests; npm install --save-dev ../../js-holochain-client
-use-npm-holochain-client:
+	cd tests; npm install --save-dev ../../holochain-client-js
+use-npm-client:
 	cd tests; npm uninstall @whi/holochain-client
 	cd tests; npm install --save-dev @whi/holochain-client
 
-use-local:		use-local-holochain-client use-local-holochain-backdrop
-use-npm:		  use-npm-holochain-client   use-npm-holochain-backdrop
+use-local:		use-local-client use-local-backdrop
+use-npm:		  use-npm-client   use-npm-backdrop
 
 
 #
@@ -86,11 +86,11 @@ clean-files-all:	clean-remove-chaff
 clean-files-all-force:	clean-remove-chaff
 	git clean -fdx
 
-PRE_HDK_VERSION = "0.1.0"
-NEW_HDK_VERSION = "0.2.0-beta-rc.1"
+PRE_HDK_VERSION = "0.2.0-beta-rc.3"
+NEW_HDK_VERSION = "0.2.0-beta-rc.4"
 
-PRE_HH_VERSION = "0.1.0-beta-rc.1", features
-NEW_HH_VERSION = "0.2.0-beta-rc.1", features
+PRE_HH_VERSION = "0.2.0-beta-rc.4", features
+NEW_HH_VERSION = "0.2.0-beta-rc.3", features
 
 GG_REPLACE_LOCATIONS = ':(exclude)*.lock' Cargo.toml tests/zomes/
 

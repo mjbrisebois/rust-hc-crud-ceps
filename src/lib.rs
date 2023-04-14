@@ -208,7 +208,8 @@ where
 
     let list = links.into_iter()
 	.filter_map(|link| {
-	    get_entity( &link.target.into() ).ok()
+	    link.target.into_entry_hash()
+		.and_then( |target| get_entity( &target ).ok() )
 	})
 	.collect();
 
