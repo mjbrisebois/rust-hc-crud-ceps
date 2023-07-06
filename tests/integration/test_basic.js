@@ -266,6 +266,8 @@ describe("CEPS", () => {
 	    "test_happ": {
 		"happy_path": DNA_PATH,
 	    },
+	}, {
+	    "timeout": 30_000,
 	});
 
 	client				= actors.alice.test_happ.client;
