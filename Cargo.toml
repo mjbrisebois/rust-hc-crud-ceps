@@ -13,8 +13,8 @@ name = "hc_crud"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-hdk = "0.3.0-beta-dev.7"
-holo_hash = { version = "0.3.0-beta-dev.4", features = [ "hashing", "encoding" ] } # needed for "from_raw_32" method
+hdk = "0.2.1-beta-rc.0"
+holo_hash = { version = "0.2.1-beta-rc.0", features = [ "hashing", "encoding" ] } # needed for "from_raw_32" method
 serde = "1"
 thiserror = "1"
 
