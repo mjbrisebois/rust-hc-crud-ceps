@@ -86,11 +86,11 @@ clean-files-all:	clean-remove-chaff
 clean-files-all-force:	clean-remove-chaff
 	git clean -fdx
 
-PRE_HDK_VERSION = "0.1.3-beta-rc.1"
-NEW_HDK_VERSION = "0.1.4"
+PRE_HDK_VERSION = "0.1.4"
+NEW_HDK_VERSION = "0.1.5"
 
-PRE_HH_VERSION = "0.1.3-beta-rc.0", features
-NEW_HH_VERSION = "0.1.4", features
+PRE_HH_VERSION = "0.1.4", features
+NEW_HH_VERSION = "0.1.5", features
 
 GG_REPLACE_LOCATIONS = ':(exclude)*.lock' Cargo.toml tests/zomes/
 
